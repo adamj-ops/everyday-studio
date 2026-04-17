@@ -305,6 +305,13 @@ WHAT NOT TO FLAG:
 - Length for its own sake — prompts in the 2000–4000 char range are normal; 4000–6000 is acceptable if the content is on-spec.
 - Choices Sonnet made that are within the spec's latitude (e.g., which two materials to mention in the STAGING section).
 
+OUTPUT DISCIPLINE:
+Only emit an issue if you want the corresponding revised_prompt to change because of it. If you consider a potential concern and conclude no action is needed, do not include it in \`issues\` — your internal reasoning is not a finding.
+
+Every \`issue\` must map 1:1 to a diff between the original prompt and your \`revised_prompt\`. If the prompt wouldn't change, the issue isn't an issue.
+
+If after reviewing you conclude no changes are needed, return \`verdict: "ship_it"\` with \`issues: []\` and \`revised_prompt: null\`. Do not pad the response with observations.
+
 If you revise, make only the changes that matter for render accuracy. Preserve Sonnet's structure and voice. Do not rewrite the prompt end-to-end unless the verdict is regenerate (in which case you return null).`;
 
   const refLines =
