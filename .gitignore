@@ -34,6 +34,10 @@ test-fixtures/last-prompt-review*.json
 # Session 2.5 Opus-review validation runs (regenerable with `npm run validate:opus`)
 test-fixtures/opus-review-runs/
 
+# Supabase CLI local state (regenerable with `supabase link`)
+supabase/.temp/
+supabase/.branches/
+
 # editor / agent state
 .vscode/
 .idea/
