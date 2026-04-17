@@ -26,8 +26,11 @@ test-output*.txt
 test-fixtures/nano-banana-output*.png
 test-fixtures/nano-banana-prompt*.txt
 test-fixtures/nano-banana-edit-*.png
-test-fixtures/last-prompt-output.json
-test-fixtures/last-prompt-review.json
+test-fixtures/last-prompt-output*.json
+test-fixtures/last-prompt-review*.json
+
+# Session 2.5 Opus-review validation runs (regenerable with `npm run validate:opus`)
+test-fixtures/opus-review-runs/
 
 # editor / agent state
 .vscode/
