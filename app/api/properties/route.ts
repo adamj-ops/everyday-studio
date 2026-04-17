@@ -1,15 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-
-const CreatePropertySchema = z.object({
-  address: z.string().min(1).max(200),
-  city: z.string().min(1).max(80),
-  state: z.string().length(2).default("MN"),
-  zip: z.string().min(5).max(10),
-  arv_estimate: z.number().nonnegative().optional(),
-  buyer_persona: z.string().optional(),
-});
+import { CreatePropertyInput } from "@/lib/specs/property";
 
 export async function GET() {
   const supabase = await createClient();
@@ -18,7 +9,13 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  return NextResponse.json({ error: "not_implemented", session: 4 }, { status: 501 });
+  const { data, error } = await supabase
+    .from("properties")
+    .select("*")
+    .order("updated_at", { ascending: false });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ properties: data });
 }
 
 export async function POST(req: NextRequest) {
@@ -29,7 +26,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => null);
-  const parsed = CreatePropertySchema.safeParse(body);
+  const parsed = CreatePropertyInput.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "invalid_input", details: parsed.error.flatten() },
@@ -37,5 +34,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({ error: "not_implemented", session: 4 }, { status: 501 });
+  const { data, error } = await supabase
+    .from("properties")
+    .insert({ ...parsed.data, owner_id: user.id })
+    .select()
+    .single();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ property: data }, { status: 201 });
 }

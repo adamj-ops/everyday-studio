@@ -1,30 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-
-// room_type is plain text in the DB; Zod owns enum validation. The literals
-// here mirror the discriminated union in lib/specs/schema.ts.
-const RoomTypeEnum = z.enum([
-  "kitchen",
-  "primary_bath",
-  "secondary_bath",
-  "powder",
-  "primary_bedroom",
-  "secondary_bedroom",
-  "living_room",
-  "family_room",
-  "dining_room",
-  "foyer",
-  "hallway",
-  "laundry",
-  "office",
-]);
-
-const CreateRoomSchema = z.object({
-  property_id: z.string().uuid(),
-  room_type: RoomTypeEnum,
-  label: z.string().min(1).max(80),
-});
+import { CreateRoomInput } from "@/lib/specs/rooms";
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -34,7 +10,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => null);
-  const parsed = CreateRoomSchema.safeParse(body);
+  const parsed = CreateRoomInput.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "invalid_input", details: parsed.error.flatten() },
@@ -42,5 +18,26 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({ error: "not_implemented", session: 4 }, { status: 501 });
+  // RLS ensures only owners can read their properties; an owned property
+  // must exist before any room is created against it.
+  const { data: property, error: propertyError } = await supabase
+    .from("properties")
+    .select("id")
+    .eq("id", parsed.data.property_id)
+    .maybeSingle();
+  if (propertyError) {
+    return NextResponse.json({ error: propertyError.message }, { status: 500 });
+  }
+  if (!property) {
+    return NextResponse.json({ error: "property_not_found" }, { status: 404 });
+  }
+
+  const { data, error } = await supabase
+    .from("rooms")
+    .upsert(parsed.data, { onConflict: "property_id,room_type,label" })
+    .select()
+    .single();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ room: data }, { status: 201 });
 }

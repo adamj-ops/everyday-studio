@@ -1,16 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-
-const PatchPropertySchema = z.object({
-  address: z.string().min(1).max(200).optional(),
-  city: z.string().min(1).max(80).optional(),
-  state: z.string().length(2).optional(),
-  zip: z.string().min(5).max(10).optional(),
-  arv_estimate: z.number().nonnegative().optional(),
-  buyer_persona: z.string().optional(),
-  status: z.enum(["active", "archived"]).optional(),
-});
+import { PatchPropertyInput } from "@/lib/specs/property";
 
 const PropertyIdSchema = z.string().uuid();
 
@@ -29,7 +20,15 @@ export async function GET(
     return NextResponse.json({ error: "invalid_id" }, { status: 400 });
   }
 
-  return NextResponse.json({ error: "not_implemented", session: 4 }, { status: 501 });
+  const { data, error } = await supabase
+    .from("properties")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!data) return NextResponse.json({ error: "not_found" }, { status: 404 });
+
+  return NextResponse.json({ property: data });
 }
 
 export async function PATCH(
@@ -48,7 +47,7 @@ export async function PATCH(
   }
 
   const body = await req.json().catch(() => null);
-  const parsed = PatchPropertySchema.safeParse(body);
+  const parsed = PatchPropertyInput.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "invalid_input", details: parsed.error.flatten() },
@@ -56,7 +55,16 @@ export async function PATCH(
     );
   }
 
-  return NextResponse.json({ error: "not_implemented", session: 4 }, { status: 501 });
+  const { data, error } = await supabase
+    .from("properties")
+    .update({ ...parsed.data, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select()
+    .maybeSingle();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!data) return NextResponse.json({ error: "not_found" }, { status: 404 });
+
+  return NextResponse.json({ property: data });
 }
 
 export async function DELETE(
@@ -74,5 +82,5 @@ export async function DELETE(
     return NextResponse.json({ error: "invalid_id" }, { status: 400 });
   }
 
-  return NextResponse.json({ error: "not_implemented", session: 4 }, { status: 501 });
+  return NextResponse.json({ error: "not_implemented", session: 6 }, { status: 501 });
 }
