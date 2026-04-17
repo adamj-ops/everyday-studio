@@ -8,6 +8,8 @@ node_modules/
 
 # build
 .next/
+.swc/
+.vercel/
 out/
 dist/
 build/
