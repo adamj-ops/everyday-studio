@@ -38,3 +38,4 @@ test-fixtures/opus-review-runs/
 .vscode/
 .idea/
 .cursor/
+tsconfig.tsbuildinfo
