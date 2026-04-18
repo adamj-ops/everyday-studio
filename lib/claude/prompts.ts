@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { RoomSpec, PropertyContext } from "../specs/schema";
 import { deriveBudgetTier } from "../specs/schema";
 
@@ -10,6 +11,10 @@ import { deriveBudgetTier } from "../specs/schema";
  *
  * Both return { system, user } objects ready to pass to the Anthropic SDK.
  * Both enforce JSON output via response_format + example in prompt.
+ *
+ * Every LLM response shape is declared as a Zod schema below and the TS types
+ * are inferred from those schemas. This is the CLAUDE.md rule-7 contract:
+ * LLM JSON responses are parsed through Zod before hitting the database.
  */
 
 import type { ReferenceMaterial } from "../specs/schema";
@@ -138,10 +143,11 @@ function summarizeSpecForPrompt(spec: RoomSpec): string {
 // PROMPT 1: Render prompt generation (Gemini natural-language format)
 // ---------------------------------------------------------------------------
 
-export interface RenderPromptOutput {
-  prompt: string; // natural-language prompt for Gemini, 2000–4000 chars typical
-  notes: string; // 1–2 sentence explanation of emphasis choices
-}
+export const RenderPromptOutputSchema = z.object({
+  prompt: z.string().min(1),
+  notes: z.string(),
+});
+export type RenderPromptOutput = z.infer<typeof RenderPromptOutputSchema>;
 
 export function buildRenderPromptRequest(args: {
   spec: RoomSpec;
@@ -243,20 +249,25 @@ Return the JSON now.`;
 // after Session 2.5 — if Opus rubber-stamps Sonnet >90% of the time, delete
 // this step. If it intervenes ≥20% of the time, keep it.
 
-export type PromptReviewSeverity = "high" | "medium" | "low";
-export type PromptReviewVerdict = "ship_it" | "revise" | "regenerate";
+export const PromptReviewSeveritySchema = z.enum(["high", "medium", "low"]);
+export const PromptReviewVerdictSchema = z.enum(["ship_it", "revise", "regenerate"]);
 
-export interface PromptReviewIssue {
-  severity: PromptReviewSeverity;
-  concern: string; // what's wrong with the prompt
-  suggestion: string; // specific fix
-}
+export const PromptReviewIssueSchema = z.object({
+  severity: PromptReviewSeveritySchema,
+  concern: z.string(),
+  suggestion: z.string(),
+});
 
-export interface PromptReviewOutput {
-  verdict: PromptReviewVerdict;
-  issues: PromptReviewIssue[];
-  revised_prompt: string | null; // populated when verdict === "revise"
-}
+export const PromptReviewOutputSchema = z.object({
+  verdict: PromptReviewVerdictSchema,
+  issues: z.array(PromptReviewIssueSchema),
+  revised_prompt: z.string().nullable(),
+});
+
+export type PromptReviewSeverity = z.infer<typeof PromptReviewSeveritySchema>;
+export type PromptReviewVerdict = z.infer<typeof PromptReviewVerdictSchema>;
+export type PromptReviewIssue = z.infer<typeof PromptReviewIssueSchema>;
+export type PromptReviewOutput = z.infer<typeof PromptReviewOutputSchema>;
 
 export function buildPromptReviewRequest(args: {
   spec: RoomSpec;
@@ -362,27 +373,39 @@ Review the prompt against the spec and return the JSON now.`;
 // catching "backsplash is horizontal not vertical" drift on a real image is
 // the job Opus was tuned for.
 
-export type ReviewSeverity = "high" | "medium" | "low";
-export type ReviewVerdict = "excellent" | "good" | "needs_correction" | "fail";
+export const ReviewSeveritySchema = z.enum(["high", "medium", "low"]);
+export const ReviewVerdictSchema = z.enum([
+  "excellent",
+  "good",
+  "needs_correction",
+  "fail",
+]);
 
-export interface RenderReviewIssue {
-  element: string; // "backsplash"
-  expected: string; // "3x12 zellige, vertical stack"
-  observed: string; // "subway tile, horizontal"
-  severity: ReviewSeverity;
-  correction_hint: string; // what to add to the re-render prompt
-}
+export const RenderReviewIssueSchema = z.object({
+  element: z.string(),
+  expected: z.string(),
+  observed: z.string(),
+  severity: ReviewSeveritySchema,
+  correction_hint: z.string(),
+});
 
-export interface RenderReviewOutput {
-  overall_match: ReviewVerdict;
-  issues: RenderReviewIssue[];
-  preserved_elements_check: {
-    element: string;
-    preserved: boolean;
-  }[];
-  approved_to_show_designer: boolean;
-  summary: string; // 1-sentence human-readable summary
-}
+export const PreservedElementCheckSchema = z.object({
+  element: z.string(),
+  preserved: z.boolean(),
+});
+
+export const RenderReviewOutputSchema = z.object({
+  overall_match: ReviewVerdictSchema,
+  issues: z.array(RenderReviewIssueSchema),
+  preserved_elements_check: z.array(PreservedElementCheckSchema),
+  approved_to_show_designer: z.boolean(),
+  summary: z.string(),
+});
+
+export type ReviewSeverity = z.infer<typeof ReviewSeveritySchema>;
+export type ReviewVerdict = z.infer<typeof ReviewVerdictSchema>;
+export type RenderReviewIssue = z.infer<typeof RenderReviewIssueSchema>;
+export type RenderReviewOutput = z.infer<typeof RenderReviewOutputSchema>;
 
 export function buildRenderReviewRequest(args: {
   spec: RoomSpec;

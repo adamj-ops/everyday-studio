@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 
@@ -14,22 +13,25 @@ export type ReferenceItem = {
 
 export type ReferencesPanelProps = {
   references: ReferenceItem[];
+  selectedIds: Set<string>;
+  onChange: (next: Set<string>) => void;
   maxSelected?: number;
 };
 
-export function ReferencesPanel({ references, maxSelected = 4 }: ReferencesPanelProps) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-
+export function ReferencesPanel({
+  references,
+  selectedIds: selected,
+  onChange,
+  maxSelected = 4,
+}: ReferencesPanelProps) {
   const toggle = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else if (next.size < maxSelected) {
-        next.add(id);
-      }
-      return next;
-    });
+    const next = new Set(selected);
+    if (next.has(id)) {
+      next.delete(id);
+    } else if (next.size < maxSelected) {
+      next.add(id);
+    }
+    onChange(next);
   };
 
   return (

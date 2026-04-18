@@ -1,4 +1,8 @@
+"use client";
+
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { RefreshCcw } from "lucide-react";
 import type {
   RenderReviewOutput,
   RenderReviewIssue,
@@ -11,9 +15,17 @@ export type ReviewNotesProps = {
   promptGated: {
     issues: { severity: string; concern: string; suggestion: string }[];
   } | null;
+  canRetriggerReview?: boolean;
+  onRetriggerReview?: () => void | Promise<void>;
 };
 
-export function ReviewNotes({ status, review, promptGated }: ReviewNotesProps) {
+export function ReviewNotes({
+  status,
+  review,
+  promptGated,
+  canRetriggerReview = false,
+  onRetriggerReview,
+}: ReviewNotesProps) {
   if (promptGated) {
     return (
       <aside className="flex h-full flex-col gap-4 overflow-y-auto rounded-xl border p-4">
@@ -44,6 +56,17 @@ export function ReviewNotes({ status, review, promptGated }: ReviewNotesProps) {
         <p className="text-xs text-muted-foreground text-pretty">
           {emptyHint(status)}
         </p>
+        {canRetriggerReview && onRetriggerReview ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => void onRetriggerReview()}
+            className="self-start"
+          >
+            <RefreshCcw className="mr-1 size-3" /> Re-run Opus review
+          </Button>
+        ) : null}
       </aside>
     );
   }

@@ -3,14 +3,8 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { RoomSpecSchema, type RoomSpec } from "@/lib/specs/schema";
 import { signStorageUrls } from "@/lib/supabase/signed-urls";
-import { SpecSidebar } from "@/components/mockup-studio/spec-sidebar";
-import { RenderCanvas } from "@/components/mockup-studio/render-canvas";
-import { ReviewNotes } from "@/components/mockup-studio/review-notes";
-import {
-  ReferencesPanel,
-  type ReferenceItem,
-} from "@/components/mockup-studio/references-panel";
-import type { RenderReviewOutput } from "@/lib/claude/prompts";
+import { StudioWorkspace } from "@/components/mockup-studio/studio-workspace";
+import { type ReferenceItem } from "@/components/mockup-studio/references-panel";
 
 export const metadata = { title: "Mockup Studio — Everyday Studio" };
 
@@ -42,7 +36,9 @@ export default async function MockupStudioPage({
         .maybeSingle(),
       supabase
         .from("renders")
-        .select("id, status, storage_path, opus_verdict, opus_critiques_json, created_at")
+        .select(
+          "id, status, storage_path, opus_verdict, opus_critiques_json, created_at",
+        )
         .eq("room_id", roomId)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -77,8 +73,9 @@ export default async function MockupStudioPage({
     }
   }
 
-  // Look up a base photo that matches this room by label (case-insensitive).
-  // This is how the Generate flow will pick the before-photo in step 3.
+  // Base photo selection — match by room_label first, fall back to room_type
+  // substring. This is the photo the Generate call sends to Gemini as the
+  // before-state anchor.
   const { data: photosData } = await supabase
     .from("property_photos")
     .select("id, storage_path, room_label")
@@ -92,8 +89,7 @@ export default async function MockupStudioPage({
     null;
 
   const renderRow = renderResult.data;
-  let initialRender: Parameters<typeof RenderCanvas>[0]["initialRender"] = null;
-  let imageReview: RenderReviewOutput | null = null;
+  let initialRender: Parameters<typeof StudioWorkspace>[0]["initialRender"] = null;
   if (renderRow) {
     let signedUrl: string | null = null;
     if (renderRow.storage_path) {
@@ -108,12 +104,11 @@ export default async function MockupStudioPage({
     initialRender = {
       id: renderRow.id,
       status: renderRow.status,
-      signedUrl,
-      createdAt: renderRow.created_at,
+      signed_url: signedUrl,
+      opus_verdict: renderRow.opus_verdict,
+      opus_critiques_json: renderRow.opus_critiques_json,
+      created_at: renderRow.created_at,
     };
-    if (renderRow.opus_critiques_json) {
-      imageReview = renderRow.opus_critiques_json as RenderReviewOutput;
-    }
   }
 
   const references = referencesResult.data ?? [];
@@ -171,34 +166,15 @@ export default async function MockupStudioPage({
           </Link>
         </div>
       ) : (
-        <div className="grid h-[calc(100dvh-10rem)] grid-cols-12 gap-4">
-          <div className="col-span-3 min-h-0">
-            <SpecSidebar
-              spec={spec}
-              version={specVersion ?? 1}
-              propertyId={propertyId}
-              roomId={roomId}
-            />
-          </div>
-          <div className="col-span-6 flex min-h-0 flex-col gap-4">
-            <ReferencesPanel references={referenceItems} />
-            <div className="min-h-0 flex-1">
-              <RenderCanvas
-                roomId={roomId}
-                initialRender={initialRender}
-                hasBasePhoto={Boolean(basePhoto)}
-                hasLockedSpec={Boolean(spec)}
-              />
-            </div>
-          </div>
-          <div className="col-span-3 min-h-0">
-            <ReviewNotes
-              status={initialRender?.status ?? null}
-              review={imageReview}
-              promptGated={null}
-            />
-          </div>
-        </div>
+        <StudioWorkspace
+          spec={spec}
+          specVersion={specVersion ?? 1}
+          propertyId={propertyId}
+          roomId={roomId}
+          basePhotoId={basePhoto?.id ?? null}
+          references={referenceItems}
+          initialRender={initialRender}
+        />
       )}
     </div>
   );

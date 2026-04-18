@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { Loader2, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -17,18 +18,35 @@ export type RenderCanvasProps = {
   } | null;
   hasBasePhoto: boolean;
   hasLockedSpec: boolean;
+  submitting: boolean;
+  pollingTimedOut: boolean;
+  onGenerate: () => void | Promise<void>;
+  onRefresh: () => void | Promise<void>;
 };
+
+const IN_FLIGHT_STATES = new Set([
+  "pending",
+  "prompt_review",
+  "rendering",
+  "image_review",
+]);
 
 export function RenderCanvas({
   initialRender,
   hasBasePhoto,
   hasLockedSpec,
+  submitting,
+  pollingTimedOut,
+  onGenerate,
+  onRefresh,
 }: RenderCanvasProps) {
   const [editInstruction, setEditInstruction] = useState("");
 
   const render = initialRender;
-  const canGenerate = hasBasePhoto && hasLockedSpec;
-  const canEdit = Boolean(render?.signedUrl);
+  const inFlight =
+    submitting || Boolean(render && IN_FLIGHT_STATES.has(render.status));
+  const canGenerate = hasBasePhoto && hasLockedSpec && !inFlight;
+  const canEdit = Boolean(render?.signedUrl) && !inFlight;
 
   return (
     <section className="flex h-full flex-col gap-4 rounded-xl border p-4">
@@ -57,21 +75,41 @@ export function RenderCanvas({
             unoptimized
             className="size-full object-contain"
           />
+        ) : inFlight ? (
+          <PipelineSkeleton status={render?.status ?? "pending"} />
         ) : (
-          <EmptyState canGenerate={canGenerate} hasBasePhoto={hasBasePhoto} hasLockedSpec={hasLockedSpec} />
+          <EmptyState
+            canGenerate={canGenerate}
+            hasBasePhoto={hasBasePhoto}
+            hasLockedSpec={hasLockedSpec}
+          />
         )}
+
+        {pollingTimedOut ? (
+          <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-background/90 px-3 py-2 text-xs">
+            <span className="text-pretty">
+              Render is taking unusually long. The pipeline keeps running server-side — refresh to check.
+            </span>
+            <Button size="sm" variant="outline" onClick={() => void onRefresh()}>
+              <RefreshCcw className="mr-1 size-3" /> Refresh
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
         <Button
           type="button"
           disabled={!canGenerate}
-          // TODO(session-6-step-3): wire to /api/render/generate
+          onClick={() => void onGenerate()}
           aria-label="Generate mockup"
         >
-          Generate mockup
+          {submitting ? (
+            <Loader2 className="mr-1 size-4 animate-spin" />
+          ) : null}
+          {render ? "Regenerate mockup" : "Generate mockup"}
         </Button>
-        {!canGenerate ? (
+        {!canGenerate && !inFlight ? (
           <span className="text-xs text-muted-foreground">
             {!hasLockedSpec
               ? "Save a spec version first."
@@ -111,6 +149,65 @@ export function RenderCanvas({
       </div>
     </section>
   );
+}
+
+function PipelineSkeleton({ status }: { status: string }) {
+  return (
+    <div className="flex flex-col items-center gap-3 px-6 py-10 text-center text-sm text-muted-foreground">
+      <Loader2 className="size-6 animate-spin" aria-hidden />
+      <p>{stageLabel(status)}</p>
+      <div className="flex items-center gap-1.5">
+        <StageDot active={isStageActive(status, "prompt")} done={isStagePast(status, "prompt")} />
+        <StageDot
+          active={isStageActive(status, "render")}
+          done={isStagePast(status, "render")}
+        />
+        <StageDot
+          active={isStageActive(status, "qa")}
+          done={isStagePast(status, "qa")}
+        />
+      </div>
+      <p className="text-xs">Typically 45–90s end-to-end.</p>
+    </div>
+  );
+}
+
+function StageDot({ active, done }: { active: boolean; done: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "size-1.5 rounded-full",
+        done ? "bg-foreground" : active ? "bg-foreground/70" : "bg-muted-foreground/40",
+      )}
+    />
+  );
+}
+
+function isStageActive(status: string, stage: "prompt" | "render" | "qa"): boolean {
+  if (stage === "prompt") return status === "pending" || status === "prompt_review";
+  if (stage === "render") return status === "rendering";
+  return status === "image_review";
+}
+
+function isStagePast(status: string, stage: "prompt" | "render" | "qa"): boolean {
+  if (stage === "prompt") return status === "rendering" || status === "image_review";
+  if (stage === "render") return status === "image_review";
+  return false;
+}
+
+function stageLabel(status: string): string {
+  switch (status) {
+    case "pending":
+    case "prompt_review":
+      return "Reviewing prompt with Opus…";
+    case "rendering":
+      return "Gemini is rendering the mockup…";
+    case "image_review":
+      return "Opus is reviewing the render…";
+    default:
+      return "Working…";
+  }
 }
 
 function EmptyState({
