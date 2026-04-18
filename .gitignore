@@ -44,3 +44,4 @@ supabase/.branches/
 .cursor/
 tsconfig.tsbuildinfo
 .vercel
+.claude/
