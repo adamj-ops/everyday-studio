@@ -96,6 +96,8 @@ Phase 1 scope: **Property Setup → Room Spec Builder → Mockup Studio.** Every
 
 9. **Model routing is role-based, not task-based.** When adding a new Claude call, decide: is this a generator (goes to `CLAUDE_OPERATOR_MODEL` — Sonnet) or a verifier/reviewer (goes to `CLAUDE_REVIEWER_MODEL` — Opus)? Don't upgrade a generator to Opus for quality — improve the prompt first. Don't downgrade a reviewer to Sonnet for cost — the whole point of the reviewer role is that verification stakes justify it.
 
+10. **Re-validate tool/model selection when the task profile changes (Phase 2+ meta-rule).** When a new stage has a task profile meaningfully different from prior stages, run a fresh validation gate on tool/model selection before building on it. Validated tools for one task are not automatically correct for another. Examples: mockup rendering (Phase 1) ≠ staging (Phase 2 Stage 5) ≠ dimensional construction renders (Phase 2 Stage 4). Gemini 2.5 Pro Image is the right answer for spec-fidelity mockups; that does not mean it's the right answer for furnishing an empty room for MLS, or for producing SketchUp-constrained build renders. Each stage gets its own validation session before the toolchain is locked in.
+
 ---
 
 ## Out of scope for Phase 1 (don't build these)
