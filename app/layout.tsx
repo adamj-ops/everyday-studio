@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { createClient } from "@/lib/supabase/server";
@@ -19,11 +21,14 @@ export default async function RootLayout({
   } = await supabase.auth.getUser();
 
   return (
-    <html lang="en">
-      <body className="antialiased min-h-screen bg-background text-foreground">
-        <header className="border-b">
-          <div className="mx-auto max-w-7xl px-6 h-14 flex items-center justify-between">
-            <Link href="/" className="font-semibold">
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+      <body className="min-h-dvh bg-background text-foreground antialiased font-sans">
+        <header className="sticky top-0 z-30 bg-background/95 backdrop-blur shadow-hairline">
+          <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
+            <Link
+              href="/"
+              className="text-sm font-semibold tracking-tight text-foreground"
+            >
               Everyday Studio
             </Link>
             {user ? (
@@ -32,7 +37,7 @@ export default async function RootLayout({
                 <form action={signOut}>
                   <button
                     type="submit"
-                    className="text-sm underline-offset-4 hover:underline"
+                    className="text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
                   >
                     Log out
                   </button>
@@ -41,7 +46,7 @@ export default async function RootLayout({
             ) : null}
           </div>
         </header>
-        <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
+        <main className="mx-auto max-w-7xl px-6 py-10">{children}</main>
         <Toaster />
       </body>
     </html>

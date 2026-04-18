@@ -2,57 +2,157 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Everyday Studio tokens — Vercel-inspired palette.
+ * See DESIGN.md for the full rationale.
+ */
+
 @layer base {
   :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --destructive-foreground: oklch(0.985 0 0);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --radius: 0.625rem;
-  }
-  .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --destructive-foreground: oklch(0.985 0 0);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    /* Surfaces */
+    --background: #ffffff;
+    --foreground: #171717;
+    --card: #ffffff;
+    --card-foreground: #171717;
+    --popover: #ffffff;
+    --popover-foreground: #171717;
+
+    /* Primary is the Vercel Black — used for dark CTAs and heading text. */
+    --primary: #171717;
+    --primary-foreground: #ffffff;
+
+    /* Secondary / muted share the subtle surface tint (#fafafa). */
+    --secondary: #fafafa;
+    --secondary-foreground: #171717;
+    --muted: #fafafa;
+    --muted-foreground: #4d4d4d;
+    --accent: #fafafa;
+    --accent-foreground: #171717;
+
+    /* Destructive uses Ship Red from the Vercel workflow palette. */
+    --destructive: #ff5b4f;
+    --destructive-foreground: #ffffff;
+
+    /* Hairline borders. Visually indistinguishable from a
+     * 1px shadow-as-border at this opacity against a white surface. */
+    --border: #ebebeb;
+    --input: #ebebeb;
+
+    /* Focus ring = Vercel Focus Blue. Used by shadcn's focus-visible rings. */
+    --ring: #0072f5;
+
+    /* Radius — 8px cards, 6px buttons (via the calc scale), 4px small. */
+    --radius: 0.5rem;
+
+    /* Neutral scale tokens (raw) for specialty components. */
+    --gray-1000: #171717;
+    --gray-600: #4d4d4d;
+    --gray-500: #666666;
+    --gray-400: #808080;
+    --gray-100: #ebebeb;
+    --gray-50: #fafafa;
+
+    /* Workflow accents — use only in workflow-pipeline contexts. */
+    --ship: #ff5b4f;
+    --preview: #de1d8d;
+    --develop: #0a72ef;
+
+    /* Link + badge colors */
+    --link: #0072f5;
+    --badge-blue-bg: #ebf5ff;
+    --badge-blue-text: #0068d6;
+
+    /* Shadow stacks used by utilities below. */
+    --shadow-hairline: 0 0 0 1px rgba(0, 0, 0, 0.08);
+    --shadow-hairline-light: 0 0 0 1px #ebebeb;
+    --shadow-card:
+      0 0 0 1px rgba(0, 0, 0, 0.08),
+      0 2px 2px rgba(0, 0, 0, 0.04),
+      0 0 0 1px #fafafa inset;
+    --shadow-card-elevated:
+      0 0 0 1px rgba(0, 0, 0, 0.08),
+      0 2px 2px rgba(0, 0, 0, 0.04),
+      0 8px 8px -8px rgba(0, 0, 0, 0.04),
+      0 0 0 1px #fafafa inset;
   }
 }
 
 @layer base {
   * {
+    /* Preserve shadcn's default-border behavior using the new hairline color. */
     @apply border-border;
   }
+
+  html {
+    font-family: var(--font-geist-sans, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol");
+  }
+
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "liga" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family: var(--font-geist-mono, ui-monospace, SFMono-Regular, "Roboto Mono", Menlo, Monaco,
+      "Liberation Mono", "DejaVu Sans Mono", "Courier New");
+    font-feature-settings: "liga" 1;
+  }
+
+  /* Display text: Vercel-style negative tracking only at display sizes.
+   * 48px+: -0.05em; 32px: -0.04em; 24px: -0.04em; <= 20px: normal. */
+  h1,
+  .text-display {
+    letter-spacing: -0.05em;
+    line-height: 1.05;
+    font-weight: 600;
+  }
+  h2 {
+    letter-spacing: -0.04em;
+    line-height: 1.2;
+    font-weight: 600;
+  }
+  h3 {
+    letter-spacing: -0.025em;
+    line-height: 1.33;
+    font-weight: 600;
+  }
+
+  /* Focus-visible ring for keyboard users. shadcn primitives already use
+   * focus-visible:ring-ring / ring-*, which picks up --ring automatically. */
+  :focus-visible {
+    outline: none;
+  }
+}
+
+@layer components {
+  /* Shadow-as-border utility for surfaces that don't want a box-model border. */
+  .shadow-hairline {
+    box-shadow: var(--shadow-hairline);
+  }
+  .shadow-hairline-light {
+    box-shadow: var(--shadow-hairline-light);
+  }
+
+  /* Vercel card stack — hairline + ambient + inner #fafafa glow. */
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+  .shadow-card-elevated {
+    box-shadow: var(--shadow-card-elevated);
+  }
+
+  /* Mono caption — uppercase technical labels. */
+  .mono-caption {
+    font-family: var(--font-geist-mono, ui-monospace, monospace);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    font-size: 0.75rem;
+    font-weight: 500;
+    font-feature-settings: "liga" 1;
   }
 }
