@@ -32,7 +32,10 @@ const config: Config = {
       colors: {
         border: "var(--border)",
         input: "var(--input)",
-        ring: "var(--ring)",
+        // hsl() wrapper with <alpha-value> placeholder so Tailwind's opacity
+        // modifier (e.g. `ring-ring/50`) substitutes the alpha channel
+        // correctly. --ring is stored as an HSL triplet in globals.css.
+        ring: "hsl(var(--ring) / <alpha-value>)",
         background: "var(--background)",
         foreground: "var(--foreground)",
         primary: {
@@ -72,6 +75,13 @@ const config: Config = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      ringWidth: {
+        // shadcn v3 components ship with `ring-3`; Tailwind v3.4 doesn't
+        // include it in the default scale, so we extend it here. Without
+        // this, every focus-visible:ring-3 class compiles to zero width
+        // and the focus ring is invisible.
+        "3": "3px",
       },
       letterSpacing: {
         tighter: "-0.04em",

@@ -38,8 +38,11 @@
     --border: #ebebeb;
     --input: #ebebeb;
 
-    /* Focus ring = Vercel Focus Blue. Used by shadcn's focus-visible rings. */
-    --ring: #0072f5;
+    /* Focus ring = Vercel Focus Blue (hsla(212, 100%, 48%, 1)).
+     * Stored as an HSL triplet (no hsl() wrapper) so Tailwind's
+     * `<alpha-value>` modifier on ring-ring/50 can substitute the alpha
+     * channel at class-compile time. */
+    --ring: 212 100% 48%;
 
     /* Radius — 8px cards, 6px buttons (via the calc scale), 4px small. */
     --radius: 0.5rem;
