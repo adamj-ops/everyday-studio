@@ -3,12 +3,33 @@
 import { useRouter } from "next/navigation";
 import { useReducer, useState } from "react";
 import { toast } from "sonner";
-import { History as HistoryIcon, Loader2, Save } from "lucide-react";
+import { History as HistoryIcon, Loader2, Save, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VariantForm } from "@/components/specs/variant-form";
 import { HistoryDialog } from "@/components/specs/history-dialog";
 import type { FieldContext } from "@/components/specs/field";
 import { RoomSpecSchema, type RoomSpec } from "@/lib/specs/schema";
+import { FIXTURES } from "@/test-fixtures/registry";
+
+const DEV = process.env.NODE_ENV === "development";
+
+function devFixtureFor(
+  roomType: RoomSpec["room_type"],
+): RoomSpec | null {
+  const name =
+    roomType === "kitchen"
+      ? "vincent-ave-kitchen"
+      : roomType === "primary_bath" ||
+          roomType === "secondary_bath" ||
+          roomType === "powder"
+        ? "vincent-ave-primary-bath"
+        : roomType === "primary_bedroom" ||
+            roomType === "secondary_bedroom"
+          ? "builder-bedroom"
+          : null;
+  if (!name) return null;
+  return { ...FIXTURES[name].spec, room_type: roomType } as RoomSpec;
+}
 
 // ---------------------------------------------------------------------------
 // State
@@ -172,6 +193,19 @@ export function RoomSpecForm({
     toast.info("Version restored — save to create a new version.");
   }
 
+  function handleDevFill() {
+    const spec = devFixtureFor(roomType);
+    if (!spec) {
+      toast.info(`No dev fixture for ${roomType} yet`);
+      return;
+    }
+    dispatch({
+      type: "LOAD_SPEC",
+      spec: { ...spec, room_name: roomName || spec.room_name } as RoomSpec,
+    });
+    toast.success("Dev fixture loaded — tweak & Save.");
+  }
+
   const errorCount = Object.keys(state.errors).length;
 
   return (
@@ -190,6 +224,17 @@ export function RoomSpecForm({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {DEV ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleDevFill}
+              title="Load a full test fixture for this room type"
+            >
+              <Wand2 className="mr-1 size-4" /> Dev: Fill All
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="outline"
