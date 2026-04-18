@@ -1,7 +1,8 @@
 "use client";
 
+import { useState, type KeyboardEvent } from "react";
 import { z } from "zod";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -220,12 +221,30 @@ function ObjectField({
     typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
   const displayLabel = label ?? humanizeSegment(lastSegment(path));
   const shape = schema.shape as Record<string, z.ZodTypeAny>;
+  // Depth heuristic from path: "paint" -> depth 0, "paint.walls" -> depth 1,
+  // "cabinetry.hardware.product" -> depth 2. Controls visual prominence so a
+  // designer reading the Paint block can scan Walls/Trim/Ceiling headings.
+  const depth = path ? path.split(".").length - 1 : 0;
 
   return (
-    <fieldset className="space-y-3 rounded-md border border-border p-3">
+    <fieldset
+      className={
+        depth === 0
+          ? "space-y-3 rounded-md border border-border p-3"
+          : "space-y-2.5 rounded-md border border-border/60 bg-muted/30 p-3"
+      }
+    >
       {displayLabel ? (
         <div className="flex items-center gap-2">
-          <legend className="text-sm font-semibold">{displayLabel}</legend>
+          <legend
+            className={
+              depth === 0
+                ? "text-sm font-semibold"
+                : "text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+            }
+          >
+            {displayLabel}
+          </legend>
           {suggestable ? (
             <SuggestPopover
               fieldPath={path}
@@ -274,6 +293,19 @@ function ArrayField({
   const element = schema.element;
   const elementLeaf = unwrap(element);
   const displayLabel = label ?? humanizeSegment(lastSegment(path));
+
+  // Arrays of strings (existing_to_keep, location_notes lists) get a chip
+  // input instead of a repeating-row-of-text-boxes. Nicer UX for tag-style
+  // data where no per-item sub-fields exist.
+  if (elementLeaf instanceof z.ZodString) {
+    return (
+      <StringArrayField
+        items={items as string[]}
+        onChange={(next) => onChange(path, next)}
+        label={displayLabel}
+      />
+    );
+  }
 
   function update(nextItems: unknown[]) {
     onChange(path, nextItems);
@@ -332,6 +364,80 @@ function ArrayField({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// StringArrayField: chip input. Enter or comma adds a chip; Backspace on an
+// empty input removes the last. Designed for fields like `existing_to_keep`
+// where items are short freeform strings.
+// ---------------------------------------------------------------------------
+function StringArrayField({
+  items,
+  onChange,
+  label,
+}: {
+  items: string[];
+  onChange: (next: string[]) => void;
+  label: string;
+}) {
+  const [draft, setDraft] = useState("");
+
+  function commit() {
+    const trimmed = draft.trim();
+    if (!trimmed) return;
+    if (items.includes(trimmed)) {
+      setDraft("");
+      return;
+    }
+    onChange([...items, trimmed]);
+    setDraft("");
+  }
+
+  function handleKey(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      commit();
+    } else if (e.key === "Backspace" && draft === "" && items.length > 0) {
+      onChange(items.slice(0, -1));
+    }
+  }
+
+  function removeAt(i: number) {
+    onChange(items.filter((_, idx) => idx !== i));
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-sm font-medium">{label}</Label>
+      <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-input bg-background p-1.5">
+        {items.map((item, i) => (
+          <span
+            key={`${item}-${i}`}
+            className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs"
+          >
+            {item}
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-destructive"
+              onClick={() => removeAt(i)}
+              aria-label={`Remove ${item}`}
+            >
+              <X className="size-3" />
+            </button>
+          </span>
+        ))}
+        <input
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={handleKey}
+          onBlur={commit}
+          placeholder={items.length === 0 ? "Type and press Enter" : ""}
+          className="flex-1 min-w-[8ch] border-0 bg-transparent text-sm outline-none focus:ring-0"
+        />
+      </div>
     </div>
   );
 }
