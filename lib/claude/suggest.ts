@@ -17,6 +17,16 @@ export interface SuggestionRequest {
   partial_spec: Record<string, unknown>; // whatever's filled in so far
 }
 
+/**
+ * The envelope Sonnet returns for every field suggestion. suggested_value is
+ * the field-shaped JSON; reasoning is a 1-2 sentence explanation the UI shows
+ * in the Suggest popover before the designer accepts.
+ */
+export interface SuggestionOutput {
+  suggested_value: unknown;
+  reasoning: string;
+}
+
 export function buildSuggestFieldRequest(args: SuggestionRequest): {
   system: string;
   user: string;
@@ -46,9 +56,18 @@ BUYER PERSONA GUIDANCE:
   - investor_rental: indestructible, neutral, zero-maintenance.
 
 OUTPUT CONTRACT:
-You must respond with ONLY a valid JSON object matching the shape of the requested field in the Everyday Studio spec schema. No preamble, no markdown.
+You must respond with ONLY a valid JSON object matching this exact envelope shape, no preamble, no markdown:
+{
+  "suggested_value": <the field-shaped value>,
+  "reasoning": <string, 1–2 sentences explaining why this choice fits the spec, budget tier, and buyer persona>
+}
 
-The requested field path will be specified in the user message. Match the nested structure exactly.`;
+The value inside "suggested_value" MUST match the schema shape of the requested field path exactly:
+  - For a scalar field (e.g., "paint.walls.color_name"), suggested_value is a string/number/boolean.
+  - For an object field (e.g., "paint.walls"), suggested_value is the object with all required sub-fields.
+  - For an array field (e.g., "appliances"), suggested_value is an array of items matching that element's schema.
+
+The reasoning should be short and concrete: name the specific reason (budget fit, cohesion with already-specified fields, buyer persona bias, supplier availability). Never repeat the value itself in the reasoning.`;
 
   const user = `PROPERTY
   Address: ${args.context.address}

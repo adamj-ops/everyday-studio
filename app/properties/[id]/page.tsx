@@ -7,6 +7,8 @@ import { signPhotoUrls } from "@/lib/supabase/signed-urls";
 import { PhotoGrid } from "@/components/photo-grid";
 import { PhotoUploadSheet } from "@/components/photo-upload-sheet";
 import { EditPropertyDialog } from "@/components/edit-property-dialog";
+import { Badge } from "@/components/ui/badge";
+import { ChevronRight } from "lucide-react";
 
 export const metadata = { title: "Property — Everyday Studio" };
 
@@ -27,9 +29,11 @@ export default async function PropertyPage({
       .order("uploaded_at", { ascending: false }),
     supabase
       .from("rooms")
-      .select("id, room_type, label")
+      .select("id, room_type, label, room_specs(version)")
       .eq("property_id", id)
-      .order("room_type"),
+      .order("room_type")
+      .order("version", { ascending: false, referencedTable: "room_specs" })
+      .limit(1, { referencedTable: "room_specs" }),
   ]);
 
   if (propertyResult.error || !propertyResult.data) {
@@ -112,22 +116,34 @@ export default async function PropertyPage({
           </div>
         ) : (
           <ul className="divide-y rounded-xl border">
-            {rooms.map((room) => (
-              <li
-                key={room.id}
-                className="flex items-center justify-between px-4 py-3 text-sm"
-              >
-                <div>
-                  <p className="font-medium">{room.label}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {roomTypeLabel(room.room_type)}
-                  </p>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  Spec builder — Session 5
-                </span>
-              </li>
-            ))}
+            {rooms.map((room) => {
+              const specVersion = Array.isArray((room as { room_specs?: unknown }).room_specs)
+                ? (((room as { room_specs: { version?: number }[] }).room_specs[0])?.version ?? null)
+                : null;
+              return (
+                <li key={room.id} className="flex items-center justify-between px-4 py-3 text-sm">
+                  <Link
+                    href={`/properties/${id}/rooms/${room.id}/spec`}
+                    className="flex flex-1 items-center justify-between gap-4"
+                  >
+                    <div>
+                      <p className="font-medium">{room.label}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {roomTypeLabel(room.room_type)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {specVersion != null ? (
+                        <Badge variant="secondary">Spec v{specVersion}</Badge>
+                      ) : (
+                        <Badge variant="outline">Spec: not started</Badge>
+                      )}
+                      <ChevronRight className="size-4 text-muted-foreground" />
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

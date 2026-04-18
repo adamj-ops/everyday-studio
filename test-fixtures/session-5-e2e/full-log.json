@@ -1,0 +1,134 @@
+[
+  {
+    "name": "setup",
+    "data": {
+      "user": "5e7035d2-3aea-400c-9056-2c4207eaea8d",
+      "property": "2050063e-d1d2-4a6d-bac1-56e939e0a756",
+      "room": "50410733-2867-4dc3-b375-dc8186224a4f"
+    }
+  },
+  {
+    "name": "save-v1",
+    "data": {
+      "status": 201,
+      "body": {
+        "id": "3028db9b-4079-4698-aed2-9aa2799b4b4d",
+        "version": 1,
+        "created_at": "2026-04-18T00:06:23.866456+00:00"
+      }
+    }
+  },
+  {
+    "name": "save-v2",
+    "data": {
+      "status": 201,
+      "body": {
+        "id": "d29dbce0-3afb-4ff6-8f11-f19041918ee1",
+        "version": 2,
+        "created_at": "2026-04-18T00:06:24.371172+00:00"
+      }
+    }
+  },
+  {
+    "name": "history",
+    "data": {
+      "status": 200,
+      "count": 2,
+      "versions": [
+        {
+          "version": 2,
+          "cab_color": "White Dove"
+        },
+        {
+          "version": 1,
+          "cab_color": "Alabaster"
+        }
+      ]
+    }
+  },
+  {
+    "name": "suggest-cabinetry-color",
+    "data": {
+      "status": 200,
+      "body": {
+        "suggested_value": {
+          "brand": "sherwin_williams",
+          "color_name": "Alabaster",
+          "color_code": "SW 7008",
+          "sheen": "satin",
+          "hex_approx": null
+        },
+        "reasoning": "Matching cabinetry color to the wall color (Alabaster SW 7008) in a tonal, monochromatic approach ties the room together cohesively against the warm Brittanicca Warm counters and unlacquered brass hardware — a combination that reads warm and timeless for a young family without leaning trendy; satin sheen is retained from the existing cabinetry spec for durability and washability.",
+        "token_usage": {
+          "input_tokens": 2038,
+          "output_tokens": 179
+        }
+      }
+    }
+  },
+  {
+    "name": "save-invalid",
+    "data": {
+      "status": 400,
+      "body": {
+        "error": "invalid_input",
+        "details": {
+          "formErrors": [],
+          "fieldErrors": {
+            "room_name": [
+              "Required"
+            ],
+            "dimensions": [
+              "Required"
+            ],
+            "ceiling_height": [
+              "Required"
+            ],
+            "existing_to_keep": [
+              "Required"
+            ],
+            "layout_notes": [
+              "Required"
+            ],
+            "paint": [
+              "Required"
+            ],
+            "flooring": [
+              "Required"
+            ],
+            "lighting": [
+              "Required"
+            ],
+            "estimated_material_cost": [
+              "Required"
+            ],
+            "cabinetry": [
+              "Required"
+            ],
+            "counters": [
+              "Required"
+            ],
+            "backsplash": [
+              "Required"
+            ],
+            "appliances": [
+              "Required"
+            ],
+            "plumbing": [
+              "Required"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "rls-other-user",
+    "data": {
+      "status": 200,
+      "body": {
+        "versions": []
+      }
+    }
+  }
+]
