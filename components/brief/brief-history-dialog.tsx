@@ -46,7 +46,13 @@ export function BriefHistoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button type="button" variant="ghost">History</Button>} />
+      <DialogTrigger
+        render={(props) => (
+          <Button type="button" variant="ghost" {...props}>
+            History
+          </Button>
+        )}
+      />
       <DialogContent className="max-h-[80dvh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Brief history</DialogTitle>

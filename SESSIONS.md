@@ -1,6 +1,8 @@
 # Everyday Studio — Phase 1 Sessions
 
-Phase 1 ships the Property Setup → Room Spec Builder → Mockup Studio flow for a single in-house designer. Five working sessions (3–6) on top of two validation sessions (1, 2). Session 7 is retired — Gemini conversational editing replaces the planned mask editor.
+Phase 1 ships the Property Setup → Project Theme → Room Brief (moodboard) → Mockup Studio flow for a single in-house designer. Sessions 1–6 built the original RoomSpec-driven pipeline. Session 7 pivoted the input surface to a moodboard-driven brief after user testing rejected the structured-form approach.
+
+> If you are reading the historical sessions below (1–6) and see references to `lib/specs/*`, `RoomSpecSchema`, `room_specs`, `components/specs/*`, `components/room-spec-form.tsx`, or the `/api/rooms/[id]/spec/*` routes — those are all retired. See Session 7 at the bottom for the live surface.
 
 **Rule:** every session ends green. `npx tsc --noEmit`, `npm run build`, `npm run test:prompts` (Sonnet + Opus), and `npm run validate:opus` all pass. If any harness breaks, fix it before closing the session.
 
@@ -205,3 +207,33 @@ Stop and confirm with the owner if the next agent proposes any of these. All out
 - Building a mask editor, inpainting workflow, or pixel-selection UI. Gemini conversational editing is the Phase 1 answer.
 - Scraping supplier sites. Supplier data is local (`data/suppliers.json`) in Phase 1.
 - Swapping shadcn primitives from Base UI back to Radix. Accept the Base UI prop shapes (`multiple` not `type="multiple"`, no `asChild` on triggers, etc.) and move on.
+
+---
+
+## Session 7 — Moodboard brief rewrite — COMPLETE
+
+**Why:** After real designer use, the structured `RoomSpec` discriminated union felt clinical, not creative. Per-field Suggest buttons fragmented decision-making. The save flow had a nav trap. We pulled the Spec Builder out and replaced it with a moodboard + creative-direction + non-negotiables brief.
+
+**What changed:**
+
+- Migration [0004_moodboard_flow.sql](supabase/migrations/0004_moodboard_flow.sql) adds `project_themes` (one per property) and `room_briefs` (versioned per room). Both RLS-scoped. `room_specs` and `reference_materials` are retained but no longer written.
+- New data model under [lib/briefs/](lib/briefs/schema.ts): `ProjectThemeSchema`, `RoomBriefSchema`, `CategoryMoodboardSchema`, plus `CATEGORIES_BY_ROOM` and `QUESTIONS_BY_ROOM` keyed on all 13 DB room types.
+- [lib/claude/prompts.ts](lib/claude/prompts.ts) re-engineered: `summarizeSpecForPrompt` replaced by `summarizeBriefForPrompt`. All three builders (`buildRenderPromptRequest`, `buildPromptReviewRequest`, `buildRenderReviewRequest`) now consume `RenderPromptInput` from [lib/briefs/prompt-input.ts](lib/briefs/prompt-input.ts). Sonnet synthesizes from creative answers + moodboard metadata + non-negotiables instead of restating a structured spec.
+- Pipeline ([lib/render/pipeline.ts](lib/render/pipeline.ts)) adapted: `runGeneratePipeline` takes `{ input: RenderPromptInput, basePhoto, moodboardImages }`. Two-pass Opus prompt review + image review unchanged.
+- API routes: new [theme](app/api/properties/[id]/theme/route.ts), [brief](app/api/rooms/[id]/brief/route.ts), [brief history](app/api/rooms/[id]/brief/history/route.ts), [moodboard upload-sign](app/api/rooms/[id]/moodboard/upload-sign/route.ts), [moodboard sign-view](app/api/rooms/[id]/moodboard/sign-view/route.ts). Updated `/api/render/generate` and `/api/renders/[id]/review` to load via the shared [loadPromptInput](lib/briefs/load.ts).
+- UI: new theme picker at `/properties/[id]/theme` ([ThemeForm](components/theme/theme-form.tsx)), brief form at `/properties/[id]/rooms/[roomId]/brief` ([BriefForm](components/brief/brief-form.tsx)), dismissible [ThemeNudgeBanner](components/theme/theme-nudge-banner.tsx) on the property page, studio sidebar swapped to [BriefSidebar](components/mockup-studio/brief-sidebar.tsx).
+- Retired: `lib/specs/*`, `lib/claude/suggest.ts`, `components/specs/*`, `components/room-spec-form.tsx`, `/api/rooms/[id]/spec/*`, `/api/references/route.ts`, `/properties/[id]/rooms/[roomId]/spec/page.tsx`. Moved 4 of the original 5 fixtures to `test-fixtures/_legacy/` (excluded from tsc).
+- Preserved: all of Session 6 (the render pipeline, mockup studio shell, conversational-edit stub). Session 7 only replaces the input shape.
+
+**Follow-up in this session:**
+
+- Rewrote `scripts/test-nano-banana.ts` (direct Gemini probe, hand-written prompt) and `scripts/validate-opus-reviewer.ts` (N repeats of the single brief fixture) against the new types. Both un-excluded from tsc.
+- `DialogTrigger` in [brief-history-dialog.tsx](components/brief/brief-history-dialog.tsx) now uses the Base UI `render` callback form to silence a ref warning.
+- Docs (this file, README.md, CLAUDE.md, AGENTS.md) swept to repoint live artifacts at `lib/briefs/*`. PHASE-2-SCOPE.md still describes the pre-rewrite plan and needs its own pass before Phase 2 starts.
+
+**Known flags:**
+
+- `reference_materials` and `room_specs` tables remain in the DB but unused. Safe to drop in a future cleanup; leaving them preserves render history.
+- [/api/render/edit/route.ts](app/api/render/edit/route.ts) is still a 501 stub from Session 6's conversational-edit plan.
+- `PHASE-2-SCOPE.md` is written in RoomSpec-era language and has not been revised.
+- Render quality could benefit from a Claude-vision pre-step that describes the before-photo before Sonnet writes the prompt (the REMOVE FROM ORIGINAL section is currently written blind since Sonnet doesn't see the photo). Product upgrade, not a bug.

@@ -1,6 +1,11 @@
 # Everyday Studio — Phase 2 Scope
 
-Phase 2 picks up after [Session 6](SESSIONS.md) ships the Mockup Studio and the full Vincent Ave kitchen flow (spec → Gemini render → Opus QA → conversational edit → approve) works end-to-end. Phase 1 owns **Stage 2 (Room Spec Builder) + Stage 3 (Mockup Studio)** of the six-stage designer workflow. Phase 2 scopes the four remaining stages listed in [CLAUDE.md "Out of scope for Phase 1"](CLAUDE.md): **Stage 1 Moodboards** (pre-spec), **Stage 4 Construction-ready renders**, **Stage 5 MLS staging**, **Stage 6 Investor portfolio pages** (post-construction). Phase 3+ (live supplier APIs, CompanyCam, Airtable, multi-user, billing) stays out of scope.
+> **WARNING: stale — written before the Session 7 moodboard rewrite.**
+> This document assumes Phase 1 shipped with the structured `RoomSpec` discriminated union and a separate future "moodboard" Stage 1. Phase 1 instead pivoted to a moodboard-driven brief as the primary input surface (see [Session 7 in SESSIONS.md](SESSIONS.md)). Stage 1 (Moodboards) as described below is partially subsumed by the current `room_briefs` table. Before starting Phase 2, rewrite the Stage 1 section and re-check dependencies — the other stages are less affected but still assume the old schema.
+
+---
+
+Phase 2 picks up after [Session 6](SESSIONS.md) ships the Mockup Studio and the full Vincent Ave kitchen flow (brief → Gemini render → Opus QA → conversational edit → approve) works end-to-end. Phase 1 owns **Stage 2 (Room Spec Builder) + Stage 3 (Mockup Studio)** of the six-stage designer workflow. Phase 2 scopes the four remaining stages listed in [CLAUDE.md "Out of scope for Phase 1"](CLAUDE.md): **Stage 1 Moodboards** (pre-spec), **Stage 4 Construction-ready renders**, **Stage 5 MLS staging**, **Stage 6 Investor portfolio pages** (post-construction). Phase 3+ (live supplier APIs, CompanyCam, Airtable, multi-user, billing) stays out of scope.
 
 This doc is citation-heavy and short. Treat it like [SESSIONS.md](SESSIONS.md): bullets, file links, no hype.
 

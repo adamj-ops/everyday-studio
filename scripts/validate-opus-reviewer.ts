@@ -1,17 +1,24 @@
 /**
- * Session 2.5 — Opus-review efficacy validation
+ * Opus prompt-review efficacy probe (post-moodboard-rewrite)
  *
- * Runs all 5 fixtures through the Sonnet → Opus prompt-review pipeline,
- * writes per-fixture JSON dumps to test-fixtures/opus-review-runs/, and
- * prints a summary table plus a keep/delete/tune recommendation.
+ * Runs the single surviving fixture (Vincent Ave kitchen brief) through
+ * the Sonnet -> Opus prompt-review loop N times, writes per-run JSON dumps
+ * to test-fixtures/opus-review-runs/, and prints a verdict distribution.
  *
- * Decision rules (locked):
- *   ≥90% ship_it  → DELETE (rubber-stamp)
- *   60–89% ship_it with useful critiques → KEEP (target)
- *   <60% ship_it  → INVESTIGATE
+ * Pre-rewrite this script used 5 fixtures to produce a keep/delete/tune
+ * recommendation. The 4 discriminated-union fixtures are now in
+ * test-fixtures/_legacy/ and not readable from the new prompt builders.
+ * Until we have 2-3 additional brief-shaped fixtures, this script trades
+ * breadth for depth: N repeats of the same fixture (temperature matters).
  *
- * Does NOT evaluate critique quality — that's a human eyeball job after
- * reading the per-fixture JSONs.
+ * Usage:
+ *   npx tsx scripts/validate-opus-reviewer.ts            # 5 repeats (default)
+ *   npx tsx scripts/validate-opus-reviewer.ts --n 10     # 10 repeats
+ *
+ * Decision rules (unchanged):
+ *   >=90% ship_it across runs  -> DELETE (rubber-stamp)
+ *   60-89% ship_it             -> KEEP (target)
+ *   <60% ship_it               -> INVESTIGATE
  */
 
 import type Anthropic from "@anthropic-ai/sdk";
@@ -24,12 +31,13 @@ import {
   type PromptReviewOutput,
   type PromptReviewIssue,
 } from "../lib/claude/prompts";
-import { FIXTURES, type FixtureRecord } from "../test-fixtures/registry";
+import { vincentAvePromptInput } from "../test-fixtures/vincent-ave-kitchen";
 
 type ClaudeClientModule = typeof import("../lib/claude/client");
 let claude: ClaudeClientModule;
 
 const OUTPUT_DIR = path.join("test-fixtures", "opus-review-runs");
+const DEFAULT_N = 5;
 
 function loadEnvLocal() {
   const envPath = path.join(process.cwd(), ".env.local");
@@ -52,6 +60,15 @@ function loadEnvLocal() {
   }
 }
 
+function parseN(argv: string[]): number {
+  const i = argv.indexOf("--n");
+  if (i === -1) return DEFAULT_N;
+  const next = argv[i + 1];
+  if (!next) return DEFAULT_N;
+  const n = Number.parseInt(next, 10);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_N;
+}
+
 function extractText(response: Anthropic.Message): string {
   return response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
@@ -60,12 +77,15 @@ function extractText(response: Anthropic.Message): string {
 }
 
 function parseJsonFromClaude<T>(text: string): T {
-  const cleaned = text.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+  const cleaned = text
+    .replace(/^```(?:json)?\s*\n?/i, "")
+    .replace(/\n?```\s*$/i, "")
+    .trim();
   return JSON.parse(cleaned) as T;
 }
 
-interface FixtureRun {
-  fixture: string;
+interface Run {
+  index: number;
   verdict: PromptReviewOutput["verdict"];
   issues: PromptReviewIssue[];
   generated_prompt: string;
@@ -78,15 +98,10 @@ interface FixtureRun {
   opus_output_tokens?: number;
 }
 
-async function runFixture(fixture: FixtureRecord): Promise<FixtureRun> {
+async function runOnce(index: number): Promise<Run> {
   const start = Date.now();
 
-  const gen = buildRenderPromptRequest({
-    spec: fixture.spec,
-    context: fixture.context,
-    base_photo_description: fixture.basePhotoDescription,
-    references: fixture.references,
-  });
+  const gen = buildRenderPromptRequest(vincentAvePromptInput);
 
   const sonnetResp = await claude.anthropicClient.messages.create({
     model: claude.CLAUDE_OPERATOR_MODEL,
@@ -97,10 +112,7 @@ async function runFixture(fixture: FixtureRecord): Promise<FixtureRun> {
   const promptOutput = parseJsonFromClaude<RenderPromptOutput>(extractText(sonnetResp));
 
   const rev = buildPromptReviewRequest({
-    spec: fixture.spec,
-    context: fixture.context,
-    base_photo_description: fixture.basePhotoDescription,
-    references: fixture.references,
+    input: vincentAvePromptInput,
     generated_prompt: promptOutput.prompt,
   });
 
@@ -112,16 +124,14 @@ async function runFixture(fixture: FixtureRecord): Promise<FixtureRun> {
   });
   const review = parseJsonFromClaude<PromptReviewOutput>(extractText(opusResp));
 
-  const elapsed_ms = Date.now() - start;
-
   return {
-    fixture: fixture.name,
+    index,
     verdict: review.verdict,
     issues: review.issues,
     generated_prompt: promptOutput.prompt,
     notes: promptOutput.notes,
     revised_prompt: review.revised_prompt,
-    elapsed_ms,
+    elapsed_ms: Date.now() - start,
     sonnet_input_tokens: sonnetResp.usage?.input_tokens,
     sonnet_output_tokens: sonnetResp.usage?.output_tokens,
     opus_input_tokens: opusResp.usage?.input_tokens,
@@ -144,38 +154,36 @@ function pad(s: string, n: number): string {
   return s.length >= n ? s : s + " ".repeat(n - s.length);
 }
 
-function verdictIcon(v: PromptReviewOutput["verdict"]): string {
-  if (v === "ship_it") return "✅";
-  if (v === "revise") return "✏️";
-  return "🔁";
+function verdictLabel(v: PromptReviewOutput["verdict"]): string {
+  return v;
 }
 
 // Anthropic prices per million tokens (Apr 2026). Sonnet 4.6: $3/$15. Opus 4.7: $5/$25.
-function estimateCostCents(run: FixtureRun): number {
-  const sonnetIn = run.sonnet_input_tokens ?? 0;
-  const sonnetOut = run.sonnet_output_tokens ?? 0;
-  const opusIn = run.opus_input_tokens ?? 0;
-  const opusOut = run.opus_output_tokens ?? 0;
+function estimateCostCents(run: Run): number {
+  const sIn = run.sonnet_input_tokens ?? 0;
+  const sOut = run.sonnet_output_tokens ?? 0;
+  const oIn = run.opus_input_tokens ?? 0;
+  const oOut = run.opus_output_tokens ?? 0;
   const dollars =
-    (sonnetIn * 3) / 1_000_000 +
-    (sonnetOut * 15) / 1_000_000 +
-    (opusIn * 5) / 1_000_000 +
-    (opusOut * 25) / 1_000_000;
+    (sIn * 3) / 1_000_000 +
+    (sOut * 15) / 1_000_000 +
+    (oIn * 5) / 1_000_000 +
+    (oOut * 25) / 1_000_000;
   return Math.round(dollars * 100);
 }
 
-function recommendation(runs: FixtureRun[]): string {
+function recommendation(runs: Run[]): string {
   const n = runs.length;
   const shipIt = runs.filter((r) => r.verdict === "ship_it").length;
   const shipRate = shipIt / n;
   const pct = (shipRate * 100).toFixed(0);
   if (shipRate >= 0.9) {
-    return `DELETE the Opus prompt-review stage — ${shipIt}/${n} (${pct}%) ship_it is a rubber-stamp.`;
+    return `DELETE the Opus prompt-review stage - ${shipIt}/${n} (${pct}%) ship_it is a rubber-stamp.`;
   }
   if (shipRate < 0.6) {
-    return `INVESTIGATE — ${shipIt}/${n} (${pct}%) ship_it is below target. Either Sonnet's prompts are weaker than expected or Opus is over-cautious. Read per-fixture JSONs before deciding.`;
+    return `INVESTIGATE - ${shipIt}/${n} (${pct}%) ship_it is below target.`;
   }
-  return `KEEP — ${shipIt}/${n} (${pct}%) ship_it is in the 60–89% target band. Review critique quality in the per-fixture JSONs to confirm interventions are useful.`;
+  return `KEEP - ${shipIt}/${n} (${pct}%) ship_it is in the 60-89% target band. Review critique quality in per-run JSONs.`;
 }
 
 async function main() {
@@ -184,34 +192,33 @@ async function main() {
 
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
-  const fixtures = Object.values(FIXTURES);
-  console.log(`\nRunning ${fixtures.length} fixtures through Sonnet → Opus…\n`);
+  const n = parseN(process.argv.slice(2));
+  console.log(`\nRunning ${n} Sonnet->Opus cycles against vincent-ave-kitchen...\n`);
 
-  const runs: FixtureRun[] = [];
-  for (const fixture of fixtures) {
-    process.stdout.write(`  [${fixture.name}] `);
+  const runs: Run[] = [];
+  for (let i = 1; i <= n; i++) {
+    process.stdout.write(`  [run ${i}] `);
     try {
-      const run = await runFixture(fixture);
+      const run = await runOnce(i);
       runs.push(run);
-      const jsonPath = path.join(OUTPUT_DIR, `${fixture.name}.json`);
+      const jsonPath = path.join(OUTPUT_DIR, `run-${String(i).padStart(2, "0")}.json`);
       fs.writeFileSync(jsonPath, JSON.stringify(run, null, 2));
       console.log(
-        `${verdictIcon(run.verdict)} ${run.verdict.padEnd(10)} ${String(run.issues.length).padStart(2)} issues   ${(run.elapsed_ms / 1000).toFixed(1)}s`,
+        `${verdictLabel(run.verdict).padEnd(12)} ${String(run.issues.length).padStart(2)} issues   ${(run.elapsed_ms / 1000).toFixed(1)}s`,
       );
     } catch (err) {
-      console.log("❌ ERROR");
+      console.log("ERROR");
       console.error(err);
       process.exit(1);
     }
   }
 
-  // Summary table
   console.log("\n" + "=".repeat(90));
   console.log("SUMMARY");
   console.log("=".repeat(90));
   console.log(
-    pad("Fixture", 34) +
-      pad("Verdict", 12) +
+    pad("Run", 8) +
+      pad("Verdict", 14) +
       pad("Issues", 8) +
       pad("Severity", 14) +
       pad("Elapsed", 10) +
@@ -223,8 +230,8 @@ async function main() {
     const cents = estimateCostCents(run);
     totalCents += cents;
     console.log(
-      pad(run.fixture, 34) +
-        pad(run.verdict, 12) +
+      pad(String(run.index), 8) +
+        pad(run.verdict, 14) +
         pad(String(run.issues.length), 8) +
         pad(severityMix(run.issues), 14) +
         pad(`${(run.elapsed_ms / 1000).toFixed(1)}s`, 10) +
@@ -235,14 +242,13 @@ async function main() {
 
   const counts = { ship_it: 0, revise: 0, regenerate: 0 };
   for (const r of runs) counts[r.verdict] += 1;
-  const n = runs.length;
   console.log(
     `\nVerdicts: ${counts.ship_it}/${n} ship_it (${Math.round((counts.ship_it / n) * 100)}%), ` +
       `${counts.revise}/${n} revise (${Math.round((counts.revise / n) * 100)}%), ` +
       `${counts.regenerate}/${n} regenerate (${Math.round((counts.regenerate / n) * 100)}%)`,
   );
   console.log(`Total estimated cost: $${(totalCents / 100).toFixed(2)}`);
-  console.log(`Per-fixture JSONs written to: ${OUTPUT_DIR}/`);
+  console.log(`Per-run JSONs written to: ${OUTPUT_DIR}/`);
   console.log(`\nRecommendation: ${recommendation(runs)}`);
   console.log();
 }

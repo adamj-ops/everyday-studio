@@ -1,5 +1,11 @@
 # Production-Readiness Audit — Phase 1
 
+> **Stale: pre-Session-7 moodboard rewrite.** This audit was run against the
+> original RoomSpec-driven pipeline and cites tables/files that were
+> retired or renamed. Treat it as historical context; re-audit before Phase 1
+> ship. Live schema now: `project_themes` + `room_briefs` (see Session 7 in
+> [SESSIONS.md](SESSIONS.md)).
+
 **Generated:** 2026-04-18
 **Audited commit:** `947f958` (Session 5 polish + Session 6 handoff)
 **Phase 1 ship criteria:** see [CLAUDE.md](CLAUDE.md) § "Phase 1 success criteria"
