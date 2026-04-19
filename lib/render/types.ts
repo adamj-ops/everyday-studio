@@ -52,6 +52,16 @@ export interface GeneratePipelineGated {
 
 export type GeneratePipelineResult = GeneratePipelineSuccess | GeneratePipelineGated;
 
+export type EditStep = "gemini_edit" | "opus_image_review";
+
+export interface EditStepEvent {
+  step: EditStep;
+  status: StepStatus;
+  detail?: unknown;
+}
+
+export type EditStepHook = (event: EditStepEvent) => void | Promise<void>;
+
 export interface EditPipelineResult {
   outcome: "rendered";
   finalPrompt: string;

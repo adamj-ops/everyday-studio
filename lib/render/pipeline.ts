@@ -17,9 +17,12 @@ import {
 } from "@/lib/claude/prompts";
 import { generateImage } from "@/lib/gemini/client";
 import { buildContentsArray } from "@/lib/gemini/prompts";
+import { buildEditPrompt } from "@/lib/gemini/edit-prompts";
 import type { RenderPromptInput } from "@/lib/briefs/prompt-input";
 
 import type {
+  EditPipelineResult,
+  EditStepHook,
   GeneratePipelineResult,
   MoodboardImage,
   PipelineTokenUsage,
@@ -355,4 +358,111 @@ export class PipelineParseError extends Error {
     this.step = step;
     this.rawExcerpt = raw.slice(0, 400);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Edit pipeline — conversational edits on a prior render
+// ---------------------------------------------------------------------------
+
+export interface RunEditPipelineArgs {
+  /**
+   * The render we're editing — its image bytes are passed to Gemini as the
+   * base photo. Gemini produces a new image; we persist it as a new renders
+   * row pointing at this one via parent_render_id.
+   */
+  parentImage: { mimeType: string; dataBase64: string };
+  /**
+   * Free-text designer instruction, e.g. "Remove the second refrigerator,
+   * keep only the panel-ready one clad in cabinet panels."
+   */
+  instruction: string;
+  /**
+   * The latest brief + theme input. Used only by the Opus image-review
+   * step at the end — we re-grade the edit against current brief intent.
+   * Pass null to skip image review (e.g. for a quick iteration loop).
+   */
+  briefInput: RenderPromptInput | null;
+  onStep?: EditStepHook;
+}
+
+/**
+ * Conversational edit: single Gemini call that applies a targeted change to
+ * the prior render while preserving everything else. Optionally re-reviewed
+ * by Opus against the current brief. Cheaper than a full generate (~$0.20
+ * vs ~$0.30) because there is no Sonnet and no prompt-review step — the
+ * designer's instruction IS the prompt, wrapped by `buildEditPrompt`.
+ */
+export async function runEditPipeline(
+  args: RunEditPipelineArgs,
+): Promise<EditPipelineResult> {
+  const tokens: PipelineTokenUsage = {
+    sonnet_in: 0,
+    sonnet_out: 0,
+    opus_prompt_in: 0,
+    opus_prompt_out: 0,
+    opus_image_in: 0,
+    opus_image_out: 0,
+  };
+
+  // 1. Gemini edit — parent image + wrapped instruction
+  await emitEdit(args.onStep, "gemini_edit", "started");
+  const editPrompt = buildEditPrompt({ instruction: args.instruction });
+  const contents = buildContentsArray({
+    basePhoto: args.parentImage,
+    references: [],
+    promptText: editPrompt,
+  });
+  const image = await generateImage({ contents });
+  await emitEdit(args.onStep, "gemini_edit", "succeeded", {
+    mimeType: image.mimeType,
+  });
+
+  // 2. Opus image review (optional)
+  let imageReview: RenderReviewOutput | null = null;
+  let imageReviewError: string | null = null;
+  if (args.briefInput) {
+    await emitEdit(args.onStep, "opus_image_review", "started");
+    try {
+      imageReview = await callOpusImageReview({
+        input: args.briefInput,
+        imageBase64: image.imageBase64,
+        mimeType: image.mimeType,
+        tokens,
+      });
+      await emitEdit(args.onStep, "opus_image_review", "succeeded", {
+        verdict: imageReview.overall_match,
+      });
+    } catch (err) {
+      imageReviewError = err instanceof Error ? err.message : String(err);
+      await emitEdit(args.onStep, "opus_image_review", "failed", {
+        error: imageReviewError,
+      });
+    }
+  }
+
+  return {
+    outcome: "rendered",
+    finalPrompt: editPrompt,
+    image: {
+      base64: image.imageBase64,
+      mimeType: image.mimeType,
+      commentary: image.commentary,
+    },
+    imageReview,
+    imageReviewError,
+    tokenUsage: {
+      opus_image_in: tokens.opus_image_in,
+      opus_image_out: tokens.opus_image_out,
+    },
+  };
+}
+
+async function emitEdit(
+  hook: EditStepHook | undefined,
+  step: Parameters<EditStepHook>[0]["step"],
+  status: Parameters<EditStepHook>[0]["status"],
+  detail?: unknown,
+): Promise<void> {
+  if (!hook) return;
+  await hook({ step, status, detail });
 }

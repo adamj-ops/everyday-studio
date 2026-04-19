@@ -1,8 +1,10 @@
 "use client";
 
+import { useId, useState } from "react";
 import Image from "next/image";
 import { Loader2, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -17,9 +19,11 @@ export interface RenderCanvasProps {
   hasBasePhoto: boolean;
   hasBrief: boolean;
   submitting: boolean;
+  editing: boolean;
   pollingTimedOut: boolean;
   onGenerate: () => void | Promise<void>;
   onRefresh: () => void | Promise<void>;
+  onApplyEdit: (instruction: string) => void | Promise<void>;
 }
 
 const IN_FLIGHT_STATES = new Set([
@@ -34,14 +38,22 @@ export function RenderCanvas({
   hasBasePhoto,
   hasBrief,
   submitting,
+  editing,
   pollingTimedOut,
   onGenerate,
   onRefresh,
+  onApplyEdit,
 }: RenderCanvasProps) {
+  const [editInstruction, setEditInstruction] = useState("");
+  const editInstructionId = useId();
   const render = initialRender;
   const inFlight =
-    submitting || Boolean(render && IN_FLIGHT_STATES.has(render.status));
+    submitting ||
+    editing ||
+    Boolean(render && IN_FLIGHT_STATES.has(render.status));
   const canGenerate = hasBasePhoto && hasBrief && !inFlight;
+  const canEdit =
+    Boolean(render?.signedUrl) && !inFlight && render?.status !== "failed";
 
   return (
     <section className="flex h-full flex-col gap-4 rounded-xl border p-4">
@@ -117,6 +129,59 @@ export function RenderCanvas({
             Last attempt failed. Click Regenerate to retry.
           </span>
         ) : null}
+      </div>
+
+      <div className="border-t pt-3">
+        <label
+          htmlFor={editInstructionId}
+          className="font-heading text-sm font-medium"
+        >
+          Conversational edit
+        </label>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {canEdit
+            ? "Change one thing at a time. The edit preserves everything else in the image."
+            : render?.status === "failed"
+              ? "Regenerate first, then you can apply targeted edits."
+              : render
+                ? "Generating… edits unlock when the render completes."
+                : "Generate a mockup first to unlock edits."}
+        </p>
+        <div className="mt-2 flex flex-col gap-2">
+          <Textarea
+            id={editInstructionId}
+            value={editInstruction}
+            onChange={(e) => setEditInstruction(e.target.value)}
+            disabled={!canEdit}
+            placeholder={
+              canEdit
+                ? "e.g. Remove the second refrigerator — there should be only one panel-ready fridge clad in cabinet panels."
+                : "Waiting on a completed render…"
+            }
+            rows={2}
+          />
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] text-muted-foreground">
+              Edits create a new version — your original render is preserved.
+            </span>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!canEdit || editInstruction.trim().length === 0}
+              onClick={() => {
+                const text = editInstruction.trim();
+                if (!text) return;
+                void onApplyEdit(text);
+                setEditInstruction("");
+              }}
+            >
+              {editing ? (
+                <Loader2 className="mr-1 size-4 animate-spin" />
+              ) : null}
+              Apply edit
+            </Button>
+          </div>
+        </div>
       </div>
     </section>
   );

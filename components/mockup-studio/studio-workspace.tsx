@@ -66,6 +66,7 @@ export function StudioWorkspace({
     initialRender ? toRenderState(initialRender) : null,
   );
   const [submitting, setSubmitting] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [pollingTimedOut, setPollingTimedOut] = useState(false);
 
   const pollAbortRef = useRef<AbortController | null>(null);
@@ -222,6 +223,52 @@ export function StudioWorkspace({
     }
   }, [render, fetchRenderOnce, applyRenderBody, startPolling]);
 
+  const onApplyEdit = useCallback(
+    async (instruction: string) => {
+      if (!render?.signedUrl) {
+        toast.error("Generate a mockup first before editing.");
+        return;
+      }
+      setEditing(true);
+      try {
+        const res = await fetch("/api/render/edit", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            render_id: render.id,
+            instruction,
+          }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          toast.error(
+            typeof body.error === "string"
+              ? `Edit failed: ${body.error}`
+              : `Edit failed (${res.status})`,
+          );
+          return;
+        }
+        const body = (await res.json()) as { render_id: string };
+        toast.success("Applying edit — polling for progress.");
+        setRender({
+          id: body.render_id,
+          status: "pending",
+          signedUrl: null,
+          createdAt: new Date().toISOString(),
+          imageReview: null,
+          promptReview: null,
+          errorMessage: null,
+        });
+        startPolling(body.render_id);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Edit failed");
+      } finally {
+        setEditing(false);
+      }
+    },
+    [render, startPolling],
+  );
+
   const onRetriggerReview = useCallback(async () => {
     if (!render) return;
     try {
@@ -296,9 +343,11 @@ export function StudioWorkspace({
               hasBasePhoto={Boolean(basePhotoId)}
               hasBrief={hasBrief}
               submitting={submitting}
+              editing={editing}
               pollingTimedOut={pollingTimedOut}
               onGenerate={onGenerate}
               onRefresh={onRefresh}
+              onApplyEdit={onApplyEdit}
             />
           )}
         </div>

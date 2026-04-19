@@ -77,6 +77,8 @@ PROMPT STRUCTURE (required sections, in this order):
 
 6. REMOVE FROM ORIGINAL — likely before-state elements the renovation replaces (dated cabinets, old counters, old flooring, dated lighting, popcorn ceiling, etc.). Use the base_photo_description to ground this in what's actually in the room.
 
+   CRITICAL — singular-fixture rule: when the brief calls for a new fixture/appliance (refrigerator, range, dishwasher, hood, sink, faucet, toilet, tub, vanity, ceiling fan, chandelier), phrase the instruction as REPLACING the existing one in the same location — NOT as adding a new one alongside. Gemini tends to duplicate unless told otherwise. Be explicit: "Replace the existing refrigerator with a panel-ready 36" counter-depth unit clad in cabinet panels — there should be exactly ONE refrigerator in the finished render, not two." Same pattern for range, dishwasher, hood, sink, faucet, toilet, tub, vanity, and any ceiling fixture. Kitchens have ONE of each major appliance unless the brief explicitly says otherwise (e.g. "two wall ovens" or "double sink").
+
 7. STAGING — one short paragraph on props and lighting quality. Include "no people, no clutter, no text, no watermarks".
 
 8. STYLE — quality tokens in prose: "architectural interior photography, photorealistic, editorial magazine quality, 35mm lens, natural light, shallow depth of field on staging props".
