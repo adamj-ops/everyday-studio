@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { BuyerPersonaEnum, type BuyerPersona } from "./schema";
+import { BuyerPersonaEnum } from "./buyer-personas";
+
+export { BuyerPersonaEnum, BUYER_PERSONA_OPTIONS, buyerPersonaLabel } from "./buyer-personas";
+export type { BuyerPersona } from "./buyer-personas";
 
 export const CreatePropertyInput = z.object({
   address: z.string().min(1).max(200),
@@ -21,24 +24,6 @@ export const PatchPropertyInput = z.object({
   status: z.enum(["active", "archived"]).optional(),
 });
 export type PatchPropertyInput = z.infer<typeof PatchPropertyInput>;
-
-const BUYER_PERSONA_LABELS: Record<BuyerPersona, string> = {
-  first_time_homebuyer: "First-time homebuyer",
-  young_family: "Young family",
-  young_professional: "Young professional",
-  downsizer: "Downsizer",
-  luxury: "Luxury",
-  investor_rental: "Investor / rental",
-};
-
-export const BUYER_PERSONA_OPTIONS: ReadonlyArray<{ value: BuyerPersona; label: string }> =
-  BuyerPersonaEnum.options.map((value) => ({ value, label: BUYER_PERSONA_LABELS[value] }));
-
-export function buyerPersonaLabel(value: string | null | undefined): string {
-  if (!value) return "—";
-  const parsed = BuyerPersonaEnum.safeParse(value);
-  return parsed.success ? BUYER_PERSONA_LABELS[parsed.data] : value;
-}
 
 export function formatUsd(cents: number | null | undefined): string {
   if (cents == null) return "—";

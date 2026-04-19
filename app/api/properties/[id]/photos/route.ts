@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { RoomTypeEnum } from "@/lib/specs/rooms";
+import { RoomTypeEnum } from "@/lib/briefs/room-types";
 
 const PropertyIdSchema = z.string().uuid();
 

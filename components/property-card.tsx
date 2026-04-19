@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { formatDistanceToNow } from "@/lib/format-date";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { buyerPersonaLabel, formatUsd } from "@/lib/specs/property";
+import { buyerPersonaLabel, formatUsd } from "@/lib/properties/property";
 
 type Props = {
   property: {

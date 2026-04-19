@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { RoomSpecSchema } from "@/lib/specs/schema";
+import { RoomBriefSchema } from "@/lib/briefs/schema";
 
 const RoomIdSchema = z.string().uuid();
 
@@ -20,18 +20,21 @@ export async function GET(
     return NextResponse.json({ error: "invalid_id" }, { status: 400 });
   }
 
-  // RLS enforces ownership via room_specs policy joining through rooms -> properties.
   const { data, error } = await supabase
-    .from("room_specs")
-    .select("id, version, spec_json, created_at")
+    .from("room_briefs")
+    .select(
+      "id, room_id, version, creative_answers, non_negotiables, category_moodboards, created_at, updated_at",
+    )
     .eq("room_id", id)
-    .order("version", { ascending: false });
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ versions: data ?? [] });
+  return NextResponse.json({ brief: data ?? null });
 }
 
 export async function PUT(
@@ -50,7 +53,7 @@ export async function PUT(
   }
 
   const body = await req.json().catch(() => null);
-  const parsed = RoomSpecSchema.safeParse(body);
+  const parsed = RoomBriefSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "invalid_input", details: parsed.error.flatten() },
@@ -58,9 +61,8 @@ export async function PUT(
     );
   }
 
-  // Look up the current max version under RLS (returns nothing if user can't see the room).
   const { data: latest, error: latestErr } = await supabase
-    .from("room_specs")
+    .from("room_briefs")
     .select("version")
     .eq("room_id", id)
     .order("version", { ascending: false })
@@ -71,9 +73,7 @@ export async function PUT(
     return NextResponse.json({ error: latestErr.message }, { status: 500 });
   }
 
-  // If user can't see ANY rows AND can't see the room itself, 404. Double-check
-  // room visibility — RLS on room_specs insert alone doesn't prove the room exists
-  // under this user's properties; catching it now is a better error than a FK fail.
+  // No prior brief + no room row visible under RLS = not found.
   if (!latest) {
     const { data: room } = await supabase
       .from("rooms")
@@ -88,18 +88,22 @@ export async function PUT(
   const nextVersion = (latest?.version ?? 0) + 1;
 
   const { data: inserted, error: insertErr } = await supabase
-    .from("room_specs")
+    .from("room_briefs")
     .insert({
       room_id: id,
-      spec_json: parsed.data,
       version: nextVersion,
+      creative_answers: parsed.data.creative_answers,
+      non_negotiables: parsed.data.non_negotiables,
+      category_moodboards: parsed.data.category_moodboards,
     })
-    .select("id, version, created_at")
+    .select(
+      "id, room_id, version, creative_answers, non_negotiables, category_moodboards, created_at, updated_at",
+    )
     .single();
 
   if (insertErr) {
     return NextResponse.json({ error: insertErr.message }, { status: 500 });
   }
 
-  return NextResponse.json(inserted, { status: 201 });
+  return NextResponse.json({ brief: inserted }, { status: 201 });
 }

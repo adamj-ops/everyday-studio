@@ -17,21 +17,24 @@ import {
 } from "@/lib/claude/prompts";
 import { generateImage } from "@/lib/gemini/client";
 import { buildContentsArray } from "@/lib/gemini/prompts";
-import type { RoomSpec, PropertyContext, ReferenceMaterial } from "@/lib/specs/schema";
+import type { RenderPromptInput } from "@/lib/briefs/prompt-input";
 
 import type {
   GeneratePipelineResult,
-  PipelineReference,
+  MoodboardImage,
   PipelineTokenUsage,
   StepHook,
 } from "./types";
 
 export interface RunGeneratePipelineArgs {
-  spec: RoomSpec;
-  context: PropertyContext;
+  input: RenderPromptInput;
   basePhoto: { mimeType: string; dataBase64: string };
-  basePhotoDescription: string;
-  references: PipelineReference[];
+  /**
+   * Moodboard image bytes, in the same order as `input.reference_images`.
+   * The pipeline does not verify lengths — caller is responsible for
+   * supplying exactly one entry per reference metadata entry.
+   */
+  moodboardImages: MoodboardImage[];
   onStep?: StepHook;
 }
 
@@ -47,15 +50,10 @@ export async function runGeneratePipeline(
     opus_image_out: 0,
   };
 
-  const refMaterials = args.references.map((r) => r.material);
-
   // ---- 1. Sonnet: generate the Gemini render prompt -----------------------
   await emit(args.onStep, "sonnet_prompt", "started");
   const sonnetPrompt = await callSonnetPrompt({
-    spec: args.spec,
-    context: args.context,
-    basePhotoDescription: args.basePhotoDescription,
-    references: refMaterials,
+    input: args.input,
     previousIssues: null,
     tokens,
   });
@@ -64,10 +62,7 @@ export async function runGeneratePipeline(
   // ---- 2. Opus: review Sonnet's prompt ------------------------------------
   await emit(args.onStep, "opus_prompt_review", "started");
   let promptReview = await callOpusPromptReview({
-    spec: args.spec,
-    context: args.context,
-    basePhotoDescription: args.basePhotoDescription,
-    references: refMaterials,
+    input: args.input,
     generatedPrompt: sonnetPrompt.prompt,
     tokens,
   });
@@ -76,12 +71,8 @@ export async function runGeneratePipeline(
   let sonnetRegenerated = false;
 
   if (promptReview.verdict === "regenerate") {
-    // One retry with Opus's issues fed back into Sonnet.
     const retrySonnet = await callSonnetPrompt({
-      spec: args.spec,
-      context: args.context,
-      basePhotoDescription: args.basePhotoDescription,
-      references: refMaterials,
+      input: args.input,
       previousIssues: promptReview.issues,
       tokens,
     });
@@ -89,10 +80,7 @@ export async function runGeneratePipeline(
     workingPrompt = retrySonnet;
 
     const retryReview = await callOpusPromptReview({
-      spec: args.spec,
-      context: args.context,
-      basePhotoDescription: args.basePhotoDescription,
-      references: refMaterials,
+      input: args.input,
       generatedPrompt: retrySonnet.prompt,
       tokens,
     });
@@ -125,7 +113,7 @@ export async function runGeneratePipeline(
   await emit(args.onStep, "gemini_render", "started");
   const contents = buildContentsArray({
     basePhoto: args.basePhoto,
-    references: args.references.map((r) => r.image),
+    references: args.moodboardImages,
     promptText: finalPrompt,
   });
   const image = await generateImage({ contents });
@@ -139,8 +127,7 @@ export async function runGeneratePipeline(
   let imageReviewError: string | null = null;
   try {
     imageReview = await callOpusImageReview({
-      spec: args.spec,
-      context: args.context,
+      input: args.input,
       imageBase64: image.imageBase64,
       mimeType: image.mimeType,
       tokens,
@@ -177,19 +164,11 @@ export async function runGeneratePipeline(
 // ---------------------------------------------------------------------------
 
 async function callSonnetPrompt(args: {
-  spec: RoomSpec;
-  context: PropertyContext;
-  basePhotoDescription: string;
-  references: ReferenceMaterial[];
+  input: RenderPromptInput;
   previousIssues: PromptReviewOutput["issues"] | null;
   tokens: PipelineTokenUsage;
 }): Promise<RenderPromptOutput> {
-  const { system, user } = buildRenderPromptRequest({
-    spec: args.spec,
-    context: args.context,
-    base_photo_description: args.basePhotoDescription,
-    references: args.references.length > 0 ? args.references : undefined,
-  });
+  const { system, user } = buildRenderPromptRequest(args.input);
 
   const userMsg = args.previousIssues
     ? `${user}\n\nPREVIOUS ATTEMPT REVIEW (regenerate):\nOpus flagged the previous prompt as regenerate for the following reasons. Address each before producing the new prompt:\n${args.previousIssues
@@ -210,19 +189,13 @@ async function callSonnetPrompt(args: {
 }
 
 async function callOpusPromptReview(args: {
-  spec: RoomSpec;
-  context: PropertyContext;
-  basePhotoDescription: string;
-  references: ReferenceMaterial[];
+  input: RenderPromptInput;
   generatedPrompt: string;
   tokens: PipelineTokenUsage;
 }): Promise<PromptReviewOutput> {
   const { system, user } = buildPromptReviewRequest({
-    spec: args.spec,
-    context: args.context,
-    base_photo_description: args.basePhotoDescription,
+    input: args.input,
     generated_prompt: args.generatedPrompt,
-    references: args.references.length > 0 ? args.references : undefined,
   });
 
   const response = await anthropicClient.messages.create({
@@ -238,13 +211,10 @@ async function callOpusPromptReview(args: {
 }
 
 /**
- * Standalone Opus image review — same call as the pipeline's internal step
- * but usable by the /api/renders/[id]/review retrigger endpoint. Returns
- * both the parsed review and the raw token usage so the caller can log it.
+ * Standalone Opus image review — callable from `/api/renders/[id]/review`.
  */
 export async function runImageReview(args: {
-  spec: RoomSpec;
-  context: PropertyContext;
+  input: RenderPromptInput;
   imageBase64: string;
   mimeType: string;
 }): Promise<{
@@ -260,8 +230,7 @@ export async function runImageReview(args: {
     opus_image_out: 0,
   };
   const review = await callOpusImageReview({
-    spec: args.spec,
-    context: args.context,
+    input: args.input,
     imageBase64: args.imageBase64,
     mimeType: args.mimeType,
     tokens,
@@ -273,16 +242,12 @@ export async function runImageReview(args: {
 }
 
 async function callOpusImageReview(args: {
-  spec: RoomSpec;
-  context: PropertyContext;
+  input: RenderPromptInput;
   imageBase64: string;
   mimeType: string;
   tokens: PipelineTokenUsage;
 }): Promise<RenderReviewOutput> {
-  const { system, user } = buildRenderReviewRequest({
-    spec: args.spec,
-    context: args.context,
-  });
+  const { system, user } = buildRenderReviewRequest({ input: args.input });
 
   const response = await anthropicClient.messages.create({
     model: CLAUDE_REVIEWER_MODEL,

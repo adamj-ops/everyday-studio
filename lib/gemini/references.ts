@@ -1,9 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ReferenceMaterial } from "../specs/schema";
-
-export type { ReferenceMaterial };
 
 /**
  * Abstract file reader so the same reference-loading code works for local
@@ -36,11 +33,10 @@ export const localFsReader: ReferenceFileReader = {
 const DEFAULT_READ_TIMEOUT_MS = 10_000;
 
 /**
- * Supabase-backed ReferenceFileReader. Uses the service-role admin client to
- * download from the `property-references` bucket (RLS is enforced upstream in
- * the API route that selects reference_materials rows — by the time a path
- * reaches this reader, ownership has already been verified). Downloads run
- * under a timeout so a slow fetch doesn't stall the render pipeline.
+ * Supabase-backed reader. Uses the service-role admin client to download
+ * from the given bucket (default `property-references`). RLS is enforced
+ * upstream by the API route that selects the rows — by the time a path
+ * reaches this reader, ownership has already been verified.
  */
 export function supabaseStorageReader(
   adminClient: SupabaseClient,
@@ -80,36 +76,4 @@ export function supabaseStorageReader(
       };
     },
   };
-}
-
-export interface LoadedReference {
-  mimeType: string;
-  dataBase64: string;
-  label: string;
-}
-
-export async function loadReferenceForGemini(
-  ref: ReferenceMaterial,
-  reader: ReferenceFileReader,
-): Promise<LoadedReference> {
-  const { mimeType, dataBase64 } = await reader.read(ref.storage_path);
-  return {
-    mimeType: ref.mime_type || mimeType,
-    dataBase64,
-    label: ref.label,
-  };
-}
-
-/**
- * Produces the `REFERENCE IMAGES:` prompt block that gets embedded in the
- * Claude-generated render prompt. Index starts at 2 because the base photo
- * is Image 1 in the contents array.
- */
-export function formatReferencesForPrompt(refs: ReferenceMaterial[]): string {
-  if (refs.length === 0) return "";
-  const lines = refs.map((r, i) => {
-    const typePart = r.material_type ? ` [${r.material_type}]` : "";
-    return `  - Image ${i + 2} (after base photo): "${r.label}"${typePart}`;
-  });
-  return `REFERENCE IMAGES:\n${lines.join("\n")}`;
 }

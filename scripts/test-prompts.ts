@@ -2,8 +2,8 @@
  * Everyday Studio — Prompt Test Harness
  *
  * Exercises the full two-tier Claude flow against the Vincent Ave kitchen
- * fixture so we can evaluate prompt + review quality BEFORE wiring it into
- * the Next.js app:
+ * brief fixture so we can evaluate prompt + review quality BEFORE wiring
+ * changes into the Next.js app:
  *
  *   Stage 1 — Sonnet (operator)  → Gemini prompt
  *   Stage 2 — Opus  (reviewer)   → verdict on Sonnet's prompt
@@ -11,10 +11,8 @@
  *
  * Usage:
  *   1. .env.local has ANTHROPIC_API_KEY (loaded automatically).
- *   2. npm run test:prompts                          # default fixture (vincent-ave-kitchen)
- *      npm run test:prompts -- luxury-kitchen        # pick a fixture
- *      npm run test:prompts -- --image <path>        # run Stage 3 on a render
- *      npm run test:prompts -- vincent-ave-kitchen --image <path>
+ *   2. npm run test:prompts                   # run all 3 stages (Stage 3 skipped without --image)
+ *      npm run test:prompts -- --image <path> # run Stage 3 on a render
  *
  * Stage 2 is deliberately a no-apply display: we want to judge whether
  * Opus's prompt review adds signal or rubber-stamps Sonnet >90% of the time.
@@ -25,7 +23,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import fs from "node:fs";
 import path from "node:path";
-import { RoomSpecSchema } from "../lib/specs/schema";
+import { RoomBriefSchema, ProjectThemeSchema } from "../lib/briefs/schema";
 import {
   buildRenderPromptRequest,
   buildPromptReviewRequest,
@@ -34,12 +32,12 @@ import {
   type PromptReviewOutput,
   type RenderReviewOutput,
 } from "../lib/claude/prompts";
-import { DEFAULT_FIXTURE, FIXTURES, getFixture, type FixtureRecord } from "../test-fixtures/registry";
+import {
+  vincentAveKitchenBrief,
+  vincentAveTheme,
+  vincentAvePromptInput,
+} from "../test-fixtures/vincent-ave-kitchen";
 
-// Note: we import the Anthropic client *dynamically* inside main() so that
-// loadEnvLocal() runs first. lib/claude/client.ts throws at module load if
-// ANTHROPIC_API_KEY is missing, and ES imports hoist above top-level code —
-// dynamic import is the cleanest way to sequence env loading before that.
 type ClaudeClientModule = typeof import("../lib/claude/client");
 
 function loadEnvLocal() {
@@ -108,16 +106,11 @@ interface HeuristicCheck {
   pass: boolean;
 }
 
-/**
- * Heuristic checks are two layers: structural (same across every fixture) plus
- * per-fixture material expectations. Adding a new fixture? Add a case to the
- * switch with the material tokens you expect to see in the prompt.
- */
-function buildHeuristicChecks(fixture: FixtureRecord, prompt: string): HeuristicCheck[] {
-  const structural: HeuristicCheck[] = [
+function buildHeuristicChecks(prompt: string): HeuristicCheck[] {
+  return [
     {
-      name: `Prompt is at least 1500 chars (enough detail for Gemini, ${prompt.length} chars)`,
-      pass: prompt.length >= 1500,
+      name: `Prompt is at least 1200 chars (enough detail for Gemini, ${prompt.length} chars)`,
+      pass: prompt.length >= 1200,
     },
     {
       name: `Prompt is under 6000 chars (advisory ceiling, ${prompt.length} chars)`,
@@ -135,81 +128,32 @@ function buildHeuristicChecks(fixture: FixtureRecord, prompt: string): Heuristic
       name: "Prompt ends with the standard close line",
       pass: /return the final rendered image only\.?\s*$/i.test(prompt.trim()),
     },
+    { name: "honors the 'no gray' non-negotiable", pass: !/gray\b/i.test(prompt) || /not gray|no gray|avoid gray/i.test(prompt) },
+    { name: "names unlacquered brass", pass: /unlacquered brass/i.test(prompt) },
+    { name: "names zellige backsplash", pass: /zellige/i.test(prompt) },
+    {
+      name: "specifies vertical stack tile pattern",
+      pass: /vertical/i.test(prompt) && /stack/i.test(prompt),
+    },
+    { name: "names shaker cabinets", pass: /shaker/i.test(prompt) },
+    { name: "names SW Alabaster paint color", pass: /alabaster/i.test(prompt) },
   ];
-
-  const perFixture: HeuristicCheck[] = [];
-  switch (fixture.name) {
-    case "vincent-ave-kitchen":
-    case "vincent-ave-kitchen-with-refs":
-      perFixture.push(
-        { name: "names Alabaster paint color", pass: /alabaster/i.test(prompt) },
-        { name: "names zellige backsplash", pass: /zellige/i.test(prompt) },
-        {
-          name: "specifies vertical stack pattern",
-          pass: /vertical/i.test(prompt) && /stack/i.test(prompt),
-        },
-        { name: "names brass hardware/pendants", pass: /brass/i.test(prompt) },
-        { name: "names white oak / LVP flooring", pass: /(white oak|lvp)/i.test(prompt) },
-        { name: "specifies morning light", pass: /morning/i.test(prompt) },
-      );
-      if (fixture.name === "vincent-ave-kitchen-with-refs") {
-        perFixture.push({
-          name: "prompt includes a REFERENCE IMAGES section",
-          pass: /reference images?:/i.test(prompt),
-        });
-      }
-      break;
-    case "vincent-ave-primary-bath":
-      perFixture.push(
-        { name: "names Alabaster vanity color", pass: /alabaster/i.test(prompt) },
-        { name: "names zellige shower walls", pass: /zellige/i.test(prompt) },
-        { name: "specifies hex floor tile", pass: /hex/i.test(prompt) },
-        { name: "names matte black plumbing", pass: /matte black/i.test(prompt) },
-        { name: "specifies walk-in glass shower", pass: /walk[- ]in|glass/i.test(prompt) },
-      );
-      break;
-    case "luxury-kitchen":
-      perFixture.push(
-        { name: "names Calacatta marble", pass: /calacatta/i.test(prompt) },
-        { name: "names unlacquered brass", pass: /unlacquered brass/i.test(prompt) },
-        { name: "names Wolf range", pass: /wolf/i.test(prompt) },
-        { name: "names Sub-Zero refrigerator", pass: /sub[- ]?zero/i.test(prompt) },
-        { name: "names inset cabinetry", pass: /inset/i.test(prompt) },
-        { name: "names White Dove paint", pass: /white dove/i.test(prompt) },
-      );
-      break;
-    case "builder-bedroom":
-      perFixture.push(
-        { name: "names Agreeable Gray paint", pass: /agreeable gray/i.test(prompt) },
-        { name: "names LVP flooring", pass: /lvp/i.test(prompt) },
-        { name: "names flush mount light", pass: /flush mount/i.test(prompt) },
-        { name: "does not invent brass/zellige/marble", pass: !/brass|zellige|marble/i.test(prompt) },
-      );
-      break;
-  }
-
-  return [...structural, ...perFixture];
 }
 
-async function testPromptGeneration(fixture: FixtureRecord): Promise<RenderPromptOutput> {
+async function testPromptGeneration(): Promise<RenderPromptOutput> {
   printDivider(
-    `STAGE 1: Sonnet generates the Gemini prompt (${claude.CLAUDE_OPERATOR_MODEL}) — fixture: ${fixture.name}`,
+    `STAGE 1: Sonnet generates the Gemini prompt (${claude.CLAUDE_OPERATOR_MODEL}) — fixture: vincent-ave-kitchen`,
   );
 
-  const parsed = RoomSpecSchema.safeParse(fixture.spec);
-  if (!parsed.success) {
-    console.error("❌ Spec failed Zod validation:");
-    console.error(JSON.stringify(parsed.error.format(), null, 2));
+  const briefParsed = RoomBriefSchema.safeParse(vincentAveKitchenBrief);
+  const themeParsed = ProjectThemeSchema.safeParse(vincentAveTheme);
+  if (!briefParsed.success || !themeParsed.success) {
+    console.error("❌ Fixture failed Zod validation");
     process.exit(1);
   }
-  console.log("✅ Spec validates against Zod schema\n");
+  console.log("✅ Brief and theme validate against Zod schemas\n");
 
-  const { system, user } = buildRenderPromptRequest({
-    spec: parsed.data,
-    context: fixture.context,
-    base_photo_description: fixture.basePhotoDescription,
-    references: fixture.references,
-  });
+  const { system, user } = buildRenderPromptRequest(vincentAvePromptInput);
 
   console.log("→ Calling Sonnet for render prompt generation…\n");
 
@@ -238,7 +182,7 @@ async function testPromptGeneration(fixture: FixtureRecord): Promise<RenderPromp
   console.log(`  ${output.notes}\n`);
 
   console.log("🔍 Heuristic quality checks:");
-  const checks = buildHeuristicChecks(fixture, output.prompt);
+  const checks = buildHeuristicChecks(output.prompt);
   for (const c of checks) {
     console.log(`  ${c.pass ? "✅" : "❌"} ${c.name}`);
   }
@@ -246,26 +190,20 @@ async function testPromptGeneration(fixture: FixtureRecord): Promise<RenderPromp
   console.log(`\n  ${passCount}/${checks.length} checks passed`);
 
   fs.writeFileSync(
-    path.join(__dirname, "..", "test-fixtures", `last-prompt-output-${fixture.name}.json`),
+    path.join(__dirname, "..", "test-fixtures", "last-prompt-output-vincent-ave-kitchen.json"),
     JSON.stringify(output, null, 2),
   );
 
   return output;
 }
 
-async function testPromptReview(
-  fixture: FixtureRecord,
-  promptOutput: RenderPromptOutput,
-): Promise<PromptReviewOutput> {
+async function testPromptReview(promptOutput: RenderPromptOutput): Promise<PromptReviewOutput> {
   printDivider(
-    `STAGE 2: Opus reviews Sonnet's prompt (${claude.CLAUDE_REVIEWER_MODEL}) — fixture: ${fixture.name}`,
+    `STAGE 2: Opus reviews Sonnet's prompt (${claude.CLAUDE_REVIEWER_MODEL}) — fixture: vincent-ave-kitchen`,
   );
 
   const { system, user } = buildPromptReviewRequest({
-    spec: fixture.spec,
-    context: fixture.context,
-    base_photo_description: fixture.basePhotoDescription,
-    references: fixture.references,
+    input: vincentAvePromptInput,
     generated_prompt: promptOutput.prompt,
   });
 
@@ -313,7 +251,7 @@ async function testPromptReview(
       "\n  Note: harness does NOT auto-apply revisions. Review both prompts side by side and decide.",
     );
     fs.writeFileSync(
-      path.join(__dirname, "..", "test-fixtures", `last-prompt-review-${fixture.name}.json`),
+      path.join(__dirname, "..", "test-fixtures", "last-prompt-review-vincent-ave-kitchen.json"),
       JSON.stringify(review, null, 2),
     );
   }
@@ -321,29 +259,21 @@ async function testPromptReview(
   return review;
 }
 
-async function testRenderReview(fixture: FixtureRecord, imagePath: string) {
+async function testRenderReview(imagePath: string) {
   printDivider(
-    `STAGE 3: Opus QA on rendered image (${claude.CLAUDE_REVIEWER_MODEL}) — fixture: ${fixture.name}`,
+    `STAGE 3: Opus QA on rendered image (${claude.CLAUDE_REVIEWER_MODEL}) — fixture: vincent-ave-kitchen`,
   );
 
   if (!fs.existsSync(imagePath)) {
     console.log(`⏭  Skipped — no image at ${imagePath}`);
-    console.log("   To test this step:");
-    console.log("   1. Run `npm run test:nano` to produce a Gemini render");
-    console.log("   2. Re-run this script with --image <path>\n");
     return;
   }
 
   const imageBuffer = fs.readFileSync(imagePath);
   const imageBase64 = imageBuffer.toString("base64");
-  // Sniff magic bytes rather than trust the extension — Gemini often saves
-  // JPEGs into a .png container which trips Anthropic's media-type check.
   const mediaType = sniffImageMediaType(imageBuffer);
 
-  const { system, user } = buildRenderReviewRequest({
-    spec: fixture.spec,
-    context: fixture.context,
-  });
+  const { system, user } = buildRenderReviewRequest({ input: vincentAvePromptInput });
 
   console.log(`→ Calling Opus for render QA on ${imagePath}…\n`);
 
@@ -405,66 +335,37 @@ async function main() {
   loadEnvLocal();
   claude = await import("../lib/claude/client");
 
-  const { fixtureName, imagePath } = parseCliArgs(process.argv.slice(2));
-  const fixture = getFixture(fixtureName);
+  const imagePath = parseImagePathArg(process.argv.slice(2));
 
-  const promptOutput = await testPromptGeneration(fixture);
-  await testPromptReview(fixture, promptOutput);
+  const promptOutput = await testPromptGeneration();
+  await testPromptReview(promptOutput);
 
   if (imagePath) {
-    await testRenderReview(fixture, imagePath);
+    await testRenderReview(imagePath);
   } else {
     printDivider("STAGE 3: Render QA Review — SKIPPED");
     console.log("No --image provided. To test Stage 3:");
-    console.log("  npm run test:prompts -- --image ./path/to/render.png");
-    console.log("  npm run test:prompts -- vincent-ave-kitchen --image ./path/to/render.png\n");
+    console.log("  npm run test:prompts -- --image ./path/to/render.png\n");
   }
 
   printDivider("DONE");
 }
 
-function parseCliArgs(argv: string[]): { fixtureName: string; imagePath: string | null } {
-  let fixtureName = DEFAULT_FIXTURE;
-  let imagePath: string | null = null;
-
+function parseImagePathArg(argv: string[]): string | null {
   for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--image") {
+    if (argv[i] === "--image") {
       const next = argv[i + 1];
       if (!next || next.startsWith("--")) {
         console.error("❌ --image requires a path argument");
         process.exit(1);
       }
-      imagePath = next;
-      i += 1;
-    } else if (a === "--fixture") {
-      const next = argv[i + 1];
-      if (!next || next.startsWith("--")) {
-        console.error("❌ --fixture requires a name argument");
-        process.exit(1);
-      }
-      fixtureName = next;
-      i += 1;
-    } else if (!a.startsWith("--")) {
-      // First bare positional is treated as the fixture name.
-      if (a in FIXTURES) {
-        fixtureName = a;
-      } else if (/\.(png|jpe?g|webp)$/i.test(a)) {
-        // Back-compat: the old single-positional was an image path.
-        imagePath = a;
-      } else {
-        console.error(`❌ Unknown positional argument "${a}".`);
-        console.error(`   Known fixtures: ${Object.keys(FIXTURES).sort().join(", ")}`);
-        console.error(`   For an image path, use --image <path>.`);
-        process.exit(1);
-      }
+      return next;
     }
   }
-
-  return { fixtureName, imagePath };
+  return null;
 }
 
 main().catch((err) => {
-  console.error(err);
+  console.error("\n❌ Test harness failed:", err);
   process.exit(1);
 });

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BUYER_PERSONA_OPTIONS } from "@/lib/specs/property";
+import { BUYER_PERSONA_OPTIONS } from "@/lib/properties/property";
 
 export type PropertyFormValues = {
   address: string;

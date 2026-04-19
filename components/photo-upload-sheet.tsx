@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ROOM_TYPE_OPTIONS, type RoomType } from "@/lib/specs/rooms";
+import { ROOM_TYPE_OPTIONS, type RoomType } from "@/lib/briefs/room-types";
 import { createClient } from "@/lib/supabase/client";
 
 type FileStatus = "pending" | "uploading" | "done" | "failed";

@@ -11,7 +11,7 @@
     "test:nano": "tsx scripts/test-nano-banana.ts",
     "edit:nano": "tsx scripts/edit-nano-banana.ts",
     "validate:opus": "tsx scripts/validate-opus-reviewer.ts",
-    "validate:schema": "tsx -e \"import('./lib/specs/schema').then(m => console.log('Schema loaded OK:', Object.keys(m).length, 'exports'))\""
+    "validate:schema": "tsx -e \"import('./lib/briefs/schema').then(m => console.log('Schema loaded OK:', Object.keys(m).length, 'exports'))\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",

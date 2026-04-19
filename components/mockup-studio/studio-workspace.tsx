@@ -1,13 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { RoomSpec } from "@/lib/specs/schema";
+import type { RoomBriefRow, ProjectThemeRow } from "@/lib/briefs/schema";
 import type { RenderReviewOutput, PromptReviewOutput } from "@/lib/claude/prompts";
-import { SpecSidebar } from "./spec-sidebar";
+import { BriefSidebar } from "./brief-sidebar";
 import { RenderCanvas } from "./render-canvas";
 import { ReviewNotes } from "./review-notes";
-import { ReferencesPanel, type ReferenceItem } from "./references-panel";
+import { MoodboardPanel, type MoodboardImageItem } from "./moodboard-panel";
 
 type InitialRender = {
   id: string;
@@ -19,12 +20,14 @@ type InitialRender = {
 } | null;
 
 export type StudioWorkspaceProps = {
-  spec: RoomSpec;
-  specVersion: number;
+  brief: RoomBriefRow | null;
+  projectTheme: ProjectThemeRow | null;
+  roomType: string;
+  roomLabel: string;
   propertyId: string;
   roomId: string;
   basePhotoId: string | null;
-  references: ReferenceItem[];
+  moodboardImages: MoodboardImageItem[];
   initialRender: InitialRender;
 };
 
@@ -48,15 +51,17 @@ const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 180_000;
 
 export function StudioWorkspace({
-  spec,
-  specVersion,
+  brief,
+  projectTheme,
+  roomType,
+  roomLabel,
   propertyId,
   roomId,
   basePhotoId,
-  references,
+  moodboardImages,
   initialRender,
 }: StudioWorkspaceProps) {
-  const [selectedRefs, setSelectedRefs] = useState<Set<string>>(new Set());
+  const hasBrief = brief !== null;
   const [render, setRender] = useState<RenderState | null>(
     initialRender ? toRenderState(initialRender) : null,
   );
@@ -136,7 +141,6 @@ export function StudioWorkspace({
           }
           setTimeout(tick, POLL_INTERVAL_MS);
         } catch (err) {
-          // Transient fetch error: retry once, then give up.
           if (ctrl.signal.aborted) return;
           console.warn("[studio] poll error, retrying once", err);
           setTimeout(tick, POLL_INTERVAL_MS * 2);
@@ -150,16 +154,18 @@ export function StudioWorkspace({
 
   useEffect(() => stopPolling, [stopPolling]);
 
-  // If we mount with an initial render that's mid-pipeline, resume polling.
   useEffect(() => {
     if (!initialRender) return;
     if (TERMINAL_STATES.has(initialRender.status)) return;
     startPolling(initialRender.id);
-    // Intentional: only run on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onGenerate = useCallback(async () => {
+    if (!hasBrief) {
+      toast.error("Save a brief for this room before generating.");
+      return;
+    }
     if (!basePhotoId) {
       toast.error("Upload a base photo tagged to this room first.");
       return;
@@ -173,7 +179,6 @@ export function StudioWorkspace({
         body: JSON.stringify({
           room_id: roomId,
           base_photo_id: basePhotoId,
-          reference_material_ids: Array.from(selectedRefs).slice(0, 4),
           idempotency_key: idempotencyKey,
         }),
       });
@@ -203,7 +208,7 @@ export function StudioWorkspace({
     } finally {
       setSubmitting(false);
     }
-  }, [basePhotoId, roomId, selectedRefs, startPolling]);
+  }, [hasBrief, basePhotoId, roomId, startPolling]);
 
   const onRefresh = useCallback(async () => {
     if (!render) return;
@@ -253,30 +258,46 @@ export function StudioWorkspace({
   return (
     <div className="grid h-[calc(100dvh-10rem)] grid-cols-12 gap-4">
       <div className="col-span-3 min-h-0">
-        <SpecSidebar
-          spec={spec}
-          version={specVersion}
+        <BriefSidebar
+          brief={brief}
+          projectTheme={projectTheme}
+          roomType={roomType}
+          roomLabel={roomLabel}
           propertyId={propertyId}
           roomId={roomId}
         />
       </div>
       <div className="col-span-6 flex min-h-0 flex-col gap-4">
-        <ReferencesPanel
-          references={references}
-          selectedIds={selectedRefs}
-          onChange={setSelectedRefs}
-        />
+        <MoodboardPanel images={moodboardImages} />
         <div className="min-h-0 flex-1">
-          <RenderCanvas
-            roomId={roomId}
-            initialRender={canvasInitial}
-            hasBasePhoto={Boolean(basePhotoId)}
-            hasLockedSpec
-            submitting={submitting}
-            pollingTimedOut={pollingTimedOut}
-            onGenerate={onGenerate}
-            onRefresh={onRefresh}
-          />
+          {!hasBrief ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">
+                Save a brief for this room before generating.
+              </p>
+              <p className="max-w-prose text-pretty">
+                The brief carries the creative direction, moodboard references, and
+                non-negotiables the renderer synthesizes into a Gemini prompt.
+              </p>
+              <Link
+                href={`/properties/${propertyId}/rooms/${roomId}/brief`}
+                className="text-sm underline-offset-4 hover:underline"
+              >
+                Open brief →
+              </Link>
+            </div>
+          ) : (
+            <RenderCanvas
+              roomId={roomId}
+              initialRender={canvasInitial}
+              hasBasePhoto={Boolean(basePhotoId)}
+              hasLockedSpec={hasBrief}
+              submitting={submitting}
+              pollingTimedOut={pollingTimedOut}
+              onGenerate={onGenerate}
+              onRefresh={onRefresh}
+            />
+          )}
         </div>
       </div>
       <div className="col-span-3 min-h-0">

@@ -3,16 +3,10 @@ import { waitUntil } from "@vercel/functions";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  RoomSpecSchema,
-  type PropertyContext,
-  type ReferenceMaterial,
-  type RoomSpec,
-} from "@/lib/specs/schema";
 import { supabaseStorageReader } from "@/lib/gemini/references";
-import { runGeneratePipeline } from "@/lib/render/pipeline";
-import { PipelineParseError } from "@/lib/render/pipeline";
-import type { PipelineReference } from "@/lib/render/types";
+import { runGeneratePipeline, PipelineParseError } from "@/lib/render/pipeline";
+import { loadPromptInput } from "@/lib/briefs/load";
+import type { MoodboardImage } from "@/lib/render/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -20,7 +14,6 @@ export const maxDuration = 300;
 const BodySchema = z.object({
   room_id: z.string().uuid(),
   base_photo_id: z.string().uuid(),
-  reference_material_ids: z.array(z.string().uuid()).max(4).optional(),
   idempotency_key: z.string().uuid().optional(),
 });
 
@@ -49,7 +42,6 @@ export async function POST(req: NextRequest) {
     );
   }
   const { room_id, base_photo_id, idempotency_key } = parsed.data;
-  const reference_material_ids = parsed.data.reference_material_ids ?? [];
 
   // Idempotency — if a prior render with the same key + room exists, return it.
   if (idempotency_key) {
@@ -64,109 +56,48 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Load everything the pipeline needs under RLS.
-  const [roomResult, specResult, photoResult] = await Promise.all([
-    supabase
-      .from("rooms")
-      .select("id, property_id, room_type, label, properties(*)")
-      .eq("id", room_id)
-      .maybeSingle(),
-    supabase
-      .from("room_specs")
-      .select("id, version, spec_json")
-      .eq("room_id", room_id)
-      .order("version", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from("property_photos")
-      .select("id, storage_path, property_id")
-      .eq("id", base_photo_id)
-      .maybeSingle(),
-  ]);
-
-  if (roomResult.error || !roomResult.data) {
-    return NextResponse.json({ error: "room_not_found" }, { status: 404 });
-  }
-  if (photoResult.error || !photoResult.data) {
+  const { data: photoRow, error: photoErr } = await supabase
+    .from("property_photos")
+    .select("id, storage_path, property_id")
+    .eq("id", base_photo_id)
+    .maybeSingle();
+  if (photoErr || !photoRow) {
     return NextResponse.json({ error: "base_photo_not_found" }, { status: 404 });
   }
-  if (photoResult.data.property_id !== roomResult.data.property_id) {
-    return NextResponse.json(
-      { error: "base_photo_not_in_property" },
-      { status: 400 },
-    );
-  }
-  if (!specResult.data) {
-    return NextResponse.json({ error: "no_spec_for_room" }, { status: 400 });
-  }
 
-  const specParsed = RoomSpecSchema.safeParse(specResult.data.spec_json);
-  if (!specParsed.success) {
-    return NextResponse.json(
-      { error: "stored_spec_invalid", details: specParsed.error.flatten() },
-      { status: 500 },
-    );
-  }
-  const spec: RoomSpec = specParsed.data;
+  // Load property + room + brief + theme via the shared loader (RLS-scoped).
+  const loaded = await loadPromptInput({
+    supabase,
+    roomId: room_id,
+    basePhotoDescription: await buildBasePhotoDescriptionFromRoom(supabase, room_id, photoRow),
+  });
 
-  const rawProperties = (roomResult.data as unknown as { properties?: unknown }).properties;
-  const propertyRow = Array.isArray(rawProperties)
-    ? (rawProperties[0] as Record<string, unknown> | undefined)
-    : (rawProperties as Record<string, unknown> | undefined);
-  if (!propertyRow) {
-    return NextResponse.json({ error: "property_not_found" }, { status: 404 });
-  }
-
-  const context = toPropertyContext(propertyRow);
-
-  // Load the reference material rows (under RLS) and verify they all belong
-  // to this property. Then prep them for the pipeline.
-  let refMaterials: Array<{ row: ReferenceMaterialRow; material: ReferenceMaterial }> = [];
-  if (reference_material_ids.length > 0) {
-    const { data: refs, error: refsErr } = await supabase
-      .from("reference_materials")
-      .select("id, label, material_type, storage_path, property_id, room_id")
-      .in("id", reference_material_ids);
-    if (refsErr) {
-      return NextResponse.json({ error: refsErr.message }, { status: 500 });
+  if (!loaded.ok) {
+    if (loaded.error === "room_not_found" || loaded.error === "property_not_found") {
+      return NextResponse.json({ error: loaded.error }, { status: 404 });
     }
-    if (!refs || refs.length !== reference_material_ids.length) {
-      return NextResponse.json(
-        { error: "reference_material_not_found" },
-        { status: 404 },
-      );
+    if (loaded.error === "no_brief_for_room") {
+      return NextResponse.json({ error: "no_brief_for_room" }, { status: 400 });
     }
-    for (const row of refs) {
-      if (row.property_id !== roomResult.data.property_id) {
-        return NextResponse.json(
-          { error: "reference_not_in_property" },
-          { status: 400 },
-        );
-      }
-    }
-    refMaterials = refs.map((row) => ({
-      row: row as ReferenceMaterialRow,
-      material: {
-        id: row.id,
-        label: row.label,
-        material_type: (row.material_type ?? null) as ReferenceMaterial["material_type"],
-        storage_path: row.storage_path,
-        mime_type: "image/jpeg", // overwritten by reader
-      },
-    }));
+    return NextResponse.json({ error: loaded.error }, { status: 500 });
   }
 
-  // Admin client for storage read/write inside the pipeline. RLS is already
-  // enforced via the selects above; the admin client is used only for
-  // (a) downloading base photo + references, (b) uploading the Gemini image,
-  // (c) updating the renders row across request boundaries.
+  // Confirm the photo belongs to the same property as the room's brief.
+  const { data: roomPropCheck } = await supabase
+    .from("rooms")
+    .select("property_id")
+    .eq("id", room_id)
+    .maybeSingle();
+  if (!roomPropCheck || roomPropCheck.property_id !== photoRow.property_id) {
+    return NextResponse.json({ error: "base_photo_not_in_property" }, { status: 400 });
+  }
+
   const admin = createAdminClient();
 
   // Download the base photo bytes.
   const { data: basePhotoBlob, error: basePhotoErr } = await admin.storage
     .from(PROPERTY_PHOTOS_BUCKET)
-    .download(photoResult.data.storage_path);
+    .download(photoRow.storage_path);
   if (basePhotoErr || !basePhotoBlob) {
     return NextResponse.json(
       { error: "base_photo_download_failed", detail: basePhotoErr?.message ?? "no data" },
@@ -179,21 +110,20 @@ export async function POST(req: NextRequest) {
     dataBase64: basePhotoBuf.toString("base64"),
   };
 
-  // Download each reference's bytes via the shared supabaseStorageReader.
+  // Download each moodboard image in the order they appear in the brief.
+  // `input.reference_images` was built with the same flattening order, so
+  // Sonnet's "Image N+1" labels line up with Gemini's content array.
   const reader = supabaseStorageReader(admin, { bucket: PROPERTY_REFERENCES_BUCKET });
-  const pipelineRefs: PipelineReference[] = [];
-  for (const { row, material } of refMaterials) {
+  const moodboardImages: MoodboardImage[] = [];
+  for (const ref of loaded.input.reference_images) {
     try {
-      const { mimeType, dataBase64 } = await reader.read(row.storage_path);
-      pipelineRefs.push({
-        material: { ...material, mime_type: mimeType },
-        image: { mimeType, dataBase64 },
-      });
+      const { mimeType, dataBase64 } = await reader.read(ref.storage_path);
+      moodboardImages.push({ mimeType, dataBase64 });
     } catch (err) {
       return NextResponse.json(
         {
           error: "reference_download_failed",
-          storage_path: row.storage_path,
+          storage_path: ref.storage_path,
           detail: err instanceof Error ? err.message : String(err),
         },
         { status: 500 },
@@ -208,7 +138,7 @@ export async function POST(req: NextRequest) {
     .insert({
       room_id,
       base_photo_id,
-      room_spec_id: specResult.data.id,
+      room_spec_id: null,
       prompt_text: "",
       status: "pending",
       idempotency_key: idempotency_key ?? null,
@@ -222,108 +152,94 @@ export async function POST(req: NextRequest) {
     );
   }
   const renderId: string = renderRow.id;
-
-  // Background pipeline run. waitUntil keeps the Vercel function warm until
-  // the promise settles, up to maxDuration (300s on this route).
-  const propertyId: string = roomResult.data.property_id;
-  const basePhotoDescription = buildBasePhotoDescription(
-    spec,
-    String(propertyRow.address ?? ""),
-  );
+  const propertyId = photoRow.property_id;
 
   waitUntil(
     (async () => {
       try {
-      const result = await runGeneratePipeline({
-        spec,
-        context,
-        basePhoto,
-        basePhotoDescription,
-        references: pipelineRefs,
-        onStep: async (event) => {
-          if (event.status !== "started") return;
-          const nextStatus = statusForStep(event.step);
-          if (!nextStatus) return;
+        const result = await runGeneratePipeline({
+          input: loaded.input,
+          basePhoto,
+          moodboardImages,
+          onStep: async (event) => {
+            if (event.status !== "started") return;
+            const nextStatus = statusForStep(event.step);
+            if (!nextStatus) return;
+            await admin.from("renders").update({ status: nextStatus }).eq("id", renderId);
+          },
+        });
+
+        if (result.outcome === "gated_by_opus") {
+          const totalCents = claudeCostCents(result.tokenUsage);
           await admin
             .from("renders")
-            .update({ status: nextStatus })
-            .eq("id", renderId);
-        },
-      });
-
-      if (result.outcome === "gated_by_opus") {
-        const totalCents = claudeCostCents(result.tokenUsage);
-        await admin
-          .from("renders")
-          .update({
-            status: "gated_by_opus",
-            prompt_text: result.sonnetPrompt.prompt,
-            opus_critiques_json: {
-              kind: "prompt_review",
-              verdict: result.promptReview.verdict,
-              issues: result.promptReview.issues,
-              revised_prompt: result.promptReview.revised_prompt,
-              sonnet_regenerated: result.sonnetRegenerated,
-            },
-            cost_estimate_cents: totalCents,
-            error_message: "Opus rejected the prompt twice",
-          })
-          .eq("id", renderId);
-        logPipeline(renderId, "gated_by_opus", result.tokenUsage, totalCents);
-        return;
-      }
-
-      // Storage-first: upload the image bytes before updating the DB row, so
-      // a DB hiccup doesn't lose the expensive Gemini asset.
-      const storagePath = `${propertyId}/${renderId}.${RENDER_EXT}`;
-      const imgBuf = Buffer.from(result.image.base64, "base64");
-      const { error: uploadErr } = await admin.storage
-        .from(RENDERS_BUCKET)
-        .upload(storagePath, imgBuf, {
-          contentType: RENDER_MIME,
-          upsert: true,
-        });
-      if (uploadErr) {
-        await admin
-          .from("renders")
-          .update({
-            status: "failed",
-            error_message: `render_upload_failed: ${uploadErr.message}`,
-          })
-          .eq("id", renderId);
-        logPipeline(renderId, "failed_upload", result.tokenUsage, 0);
-        return;
-      }
-
-      const totalCents = claudeCostCents(result.tokenUsage) + GEMINI_COST_CENTS;
-      const finalStatus = result.imageReview ? "complete" : "complete_qa_pending";
-      await admin
-        .from("renders")
-        .update({
-          status: finalStatus,
-          prompt_text: result.finalPrompt,
-          storage_path: storagePath,
-          opus_verdict: result.imageReview?.overall_match
-            ? mapImageVerdictToDb(result.imageReview.overall_match)
-            : null,
-          opus_critiques_json: result.imageReview
-            ? {
-                kind: "image_review",
-                ...result.imageReview,
-                prompt_review: result.promptReview,
-                sonnet_regenerated: result.sonnetRegenerated,
-                commentary: result.image.commentary,
-              }
-            : {
-                kind: "image_review_failed",
-                error: result.imageReviewError,
-                prompt_review: result.promptReview,
+            .update({
+              status: "gated_by_opus",
+              prompt_text: result.sonnetPrompt.prompt,
+              opus_critiques_json: {
+                kind: "prompt_review",
+                verdict: result.promptReview.verdict,
+                issues: result.promptReview.issues,
+                revised_prompt: result.promptReview.revised_prompt,
                 sonnet_regenerated: result.sonnetRegenerated,
               },
-          cost_estimate_cents: totalCents,
-        })
-        .eq("id", renderId);
-      logPipeline(renderId, finalStatus, result.tokenUsage, totalCents);
+              cost_estimate_cents: totalCents,
+              error_message: "Opus rejected the prompt twice",
+            })
+            .eq("id", renderId);
+          logPipeline(renderId, "gated_by_opus", result.tokenUsage, totalCents);
+          return;
+        }
+
+        const storagePath = `${propertyId}/${renderId}.${RENDER_EXT}`;
+        const imgBuf = Buffer.from(result.image.base64, "base64");
+        const { error: uploadErr } = await admin.storage
+          .from(RENDERS_BUCKET)
+          .upload(storagePath, imgBuf, {
+            contentType: RENDER_MIME,
+            upsert: true,
+          });
+        if (uploadErr) {
+          await admin
+            .from("renders")
+            .update({
+              status: "failed",
+              error_message: `render_upload_failed: ${uploadErr.message}`,
+            })
+            .eq("id", renderId);
+          logPipeline(renderId, "failed_upload", result.tokenUsage, 0);
+          return;
+        }
+
+        const totalCents = claudeCostCents(result.tokenUsage) + GEMINI_COST_CENTS;
+        const finalStatus = result.imageReview ? "complete" : "complete_qa_pending";
+        await admin
+          .from("renders")
+          .update({
+            status: finalStatus,
+            prompt_text: result.finalPrompt,
+            storage_path: storagePath,
+            opus_verdict: result.imageReview?.overall_match
+              ? mapImageVerdictToDb(result.imageReview.overall_match)
+              : null,
+            opus_critiques_json: result.imageReview
+              ? {
+                  kind: "image_review",
+                  ...result.imageReview,
+                  prompt_review: result.promptReview,
+                  sonnet_regenerated: result.sonnetRegenerated,
+                  commentary: result.image.commentary,
+                }
+              : {
+                  kind: "image_review_failed",
+                  error: result.imageReviewError,
+                  prompt_review: result.promptReview,
+                  sonnet_regenerated: result.sonnetRegenerated,
+                },
+            cost_estimate_cents: totalCents,
+          })
+          .eq("id", renderId);
+        logPipeline(renderId, finalStatus, result.tokenUsage, totalCents);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         const detail =
@@ -346,36 +262,14 @@ export async function POST(req: NextRequest) {
 // Helpers
 // ---------------------------------------------------------------------------
 
-type ReferenceMaterialRow = {
-  id: string;
-  label: string;
-  material_type: string | null;
-  storage_path: string;
-  property_id: string;
-  room_id: string | null;
-};
-
-function toPropertyContext(row: Record<string, unknown>): PropertyContext {
-  const arv = Number(row.arv_estimate ?? 0);
-  const safeArv = Number.isFinite(arv) && arv > 0 ? arv : 1;
-  return {
-    address: String(row.address ?? ""),
-    arv: safeArv,
-    // Not tracked on `properties` yet; stub with sensible positives so
-    // PropertyContextSchema.parse doesn't blow up and deriveBudgetTier
-    // can still give Sonnet a signal based on ARV alone.
-    purchase_price: Math.max(1, Math.round(safeArv * 0.5)),
-    rehab_budget: Math.max(1, Math.round(safeArv * 0.1)),
-    buyer_persona: (row.buyer_persona as PropertyContext["buyer_persona"]) ?? "young_family",
-    neighborhood_notes: null,
-    style_direction: null,
-  };
-}
-
-function buildBasePhotoDescription(spec: RoomSpec, address: string): string {
-  // We don't have an AI-generated description of the before-photo yet;
-  // give Sonnet enough context to ground the REMOVE FROM ORIGINAL section.
-  return `Before-state photo of the ${spec.room_type.replace(/_/g, " ")} (${spec.room_name}) at ${address}. Designer has not provided a written description — infer the before state from the photo itself.`;
+async function buildBasePhotoDescriptionFromRoom(
+  _supabase: unknown,
+  _roomId: string,
+  photo: { storage_path: string },
+): Promise<string> {
+  // We don't have an AI-generated description of the before-photo yet; give
+  // Sonnet enough context to ground the REMOVE FROM ORIGINAL section.
+  return `Before-state photo of the room (storage: ${photo.storage_path}). Designer has not provided a written description — infer the before state from the photo itself.`;
 }
 
 function statusForStep(
@@ -390,11 +284,7 @@ function statusForStep(
 
 function mapImageVerdictToDb(
   verdict: "excellent" | "good" | "needs_correction" | "fail",
-): "ship_it" | "revise" | "regenerate" | null {
-  // renders.opus_verdict was sized for the prompt-review verdicts
-  // (ship_it | revise | regenerate) per migration 0001. Map the image
-  // verdicts onto that set: excellent/good -> ship_it,
-  // needs_correction -> revise, fail -> regenerate.
+): "ship_it" | "revise" | "regenerate" {
   if (verdict === "excellent" || verdict === "good") return "ship_it";
   if (verdict === "needs_correction") return "revise";
   return "regenerate";
@@ -408,8 +298,6 @@ function claudeCostCents(usage: {
   opus_image_in: number;
   opus_image_out: number;
 }): number {
-  // Rough per-token cost in cents. Sonnet ~ $3/M in, $15/M out; Opus
-  // ~ $15/M in, $75/M out. Multiplied by 100 to get cents.
   const sonnetCents =
     (usage.sonnet_in * 3) / 10000 + (usage.sonnet_out * 15) / 10000;
   const opusCents =

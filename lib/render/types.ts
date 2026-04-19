@@ -4,7 +4,6 @@ import type {
   RenderReviewOutput,
 } from "@/lib/claude/prompts";
 import type { GeminiImageInput } from "@/lib/gemini/prompts";
-import type { ReferenceMaterial } from "@/lib/specs/schema";
 
 export type PipelineStep =
   | "sonnet_prompt"
@@ -21,17 +20,6 @@ export interface StepEvent {
 }
 
 export type StepHook = (event: StepEvent) => void | Promise<void>;
-
-/**
- * Pipeline reference: the metadata that feeds the Sonnet/Opus prompt builders
- * plus the raw bytes that feed the Gemini contents array, colocated so the
- * pipeline can't mis-pair them. Build one of these per attached reference in
- * the API route, then pass the array into the pipeline.
- */
-export interface PipelineReference {
-  material: ReferenceMaterial;
-  image: GeminiImageInput;
-}
 
 export interface PipelineTokenUsage {
   sonnet_in: number;
@@ -75,3 +63,11 @@ export interface EditPipelineResult {
     opus_image_out: number;
   };
 }
+
+/**
+ * Moodboard image bytes paired with index-matched metadata from
+ * `RenderPromptInput.reference_images`. The pipeline passes these straight
+ * into `buildContentsArray` so Gemini's multi-image content order matches
+ * what Sonnet described in its prompt.
+ */
+export type MoodboardImage = GeminiImageInput;

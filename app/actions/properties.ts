@@ -3,8 +3,8 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { CreatePropertyInput, PatchPropertyInput } from "@/lib/specs/property";
-import { BuyerPersonaEnum } from "@/lib/specs/schema";
+import { CreatePropertyInput, PatchPropertyInput } from "@/lib/properties/property";
+import { BuyerPersonaEnum } from "@/lib/properties/buyer-personas";
 
 type ActionResult = { error?: string };
 

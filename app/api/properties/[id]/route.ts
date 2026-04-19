@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { PatchPropertyInput } from "@/lib/specs/property";
+import { PatchPropertyInput } from "@/lib/properties/property";
 
 const PropertyIdSchema = z.string().uuid();
 

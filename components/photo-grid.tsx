@@ -1,4 +1,4 @@
-import { roomTypeLabel } from "@/lib/specs/rooms";
+import { roomTypeLabel } from "@/lib/briefs/room-types";
 
 type Photo = {
   id: string;
