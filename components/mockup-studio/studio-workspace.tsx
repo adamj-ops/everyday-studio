@@ -294,7 +294,7 @@ export function StudioWorkspace({
               roomId={roomId}
               initialRender={canvasInitial}
               hasBasePhoto={Boolean(basePhotoId)}
-              hasLockedSpec={hasBrief}
+              hasBrief={hasBrief}
               submitting={submitting}
               pollingTimedOut={pollingTimedOut}
               onGenerate={onGenerate}

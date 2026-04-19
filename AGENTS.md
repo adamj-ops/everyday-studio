@@ -7,6 +7,8 @@
 - For multi-file changes, show a plan with the full file list for approval before writing any code.
 - Every new API route must validate its input with Zod.
 - Handle every Gemini response with the same `inlineData` extraction pattern the existing test scripts already use — no bespoke parsing per call site.
+- When given a plan with pre-created todos, execute straight through: mark each `in_progress` as started, complete all todos without stopping, and never edit the plan file itself.
+- Every save, upload, and API action must produce visible feedback (toast or inline message) and never strand the user — nav bar and breadcrumbs stay clickable regardless of form state; no silent successes or failures.
 
 ## Learned Workspace Facts
 
