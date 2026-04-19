@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReferenceMaterial } from "../specs/schema";
 
 export type { ReferenceMaterial };
@@ -7,8 +8,8 @@ export type { ReferenceMaterial };
 /**
  * Abstract file reader so the same reference-loading code works for local
  * test scripts (fs-backed) and the Next.js server (Supabase Storage-backed).
- * Test harnesses pass `localFsReader` explicitly. API routes in Session 3
- * will pass a Supabase-backed reader.
+ * Test harnesses pass `localFsReader` explicitly. Server API routes pass a
+ * Supabase-backed reader built by `supabaseStorageReader`.
  */
 export interface ReferenceFileReader {
   read(storagePath: string): Promise<{ mimeType: string; dataBase64: string }>;
@@ -32,9 +33,54 @@ export const localFsReader: ReferenceFileReader = {
   },
 };
 
-// TODO(supabase): implement supabaseStorageReader in Session 3
-// that signs URLs from the `property-references` bucket and
-// downloads them into the same shape.
+const DEFAULT_READ_TIMEOUT_MS = 10_000;
+
+/**
+ * Supabase-backed ReferenceFileReader. Uses the service-role admin client to
+ * download from the `property-references` bucket (RLS is enforced upstream in
+ * the API route that selects reference_materials rows — by the time a path
+ * reaches this reader, ownership has already been verified). Downloads run
+ * under a timeout so a slow fetch doesn't stall the render pipeline.
+ */
+export function supabaseStorageReader(
+  adminClient: SupabaseClient,
+  opts: { bucket?: string; timeoutMs?: number } = {},
+): ReferenceFileReader {
+  const bucket = opts.bucket ?? "property-references";
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_READ_TIMEOUT_MS;
+
+  return {
+    async read(storagePath) {
+      const download = adminClient.storage.from(bucket).download(storagePath);
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error(
+                `supabaseStorageReader: download timed out after ${timeoutMs}ms for ${bucket}/${storagePath}`,
+              ),
+            ),
+          timeoutMs,
+        ),
+      );
+
+      const { data, error } = await Promise.race([download, timeout]);
+      if (error || !data) {
+        throw new Error(
+          `supabaseStorageReader: failed to download ${bucket}/${storagePath}: ${error?.message ?? "no data"}`,
+        );
+      }
+
+      const buf = Buffer.from(await data.arrayBuffer());
+      const mimeType = data.type || mimeFromPath(storagePath);
+
+      return {
+        mimeType,
+        dataBase64: buf.toString("base64"),
+      };
+    },
+  };
+}
 
 export interface LoadedReference {
   mimeType: string;

@@ -75,16 +75,26 @@ export default async function SpecBuilderPage({
 
   return (
     <div className="space-y-4">
-      <nav className="text-xs text-muted-foreground">
-        <Link href="/dashboard" className="hover:underline">
-          Dashboard
-        </Link>
-        {" / "}
-        <Link href={`/properties/${id}`} className="hover:underline">
-          {property.address}
-        </Link>
-        {" / "}
-        <span>{room.label}</span>
+      <nav className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+        <div>
+          <Link href="/dashboard" className="hover:underline">
+            Dashboard
+          </Link>
+          {" / "}
+          <Link href={`/properties/${id}`} className="hover:underline">
+            {property.address}
+          </Link>
+          {" / "}
+          <span>{room.label}</span>
+        </div>
+        {initialVersion != null ? (
+          <Link
+            href={`/properties/${id}/rooms/${room.id}/studio`}
+            className="text-foreground underline-offset-4 hover:underline"
+          >
+            Open Studio →
+          </Link>
+        ) : null}
       </nav>
       <RoomSpecForm
         roomId={room.id}
