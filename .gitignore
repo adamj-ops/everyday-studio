@@ -45,3 +45,6 @@ supabase/.branches/
 tsconfig.tsbuildinfo
 .vercel
 .claude/
+
+# firecrawl CLI scratch (research artifacts, not code)
+.firecrawl/
