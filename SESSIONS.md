@@ -234,6 +234,6 @@ Stop and confirm with the owner if the next agent proposes any of these. All out
 **Known flags:**
 
 - `reference_materials` and `room_specs` tables remain in the DB but unused. Safe to drop in a future cleanup; leaving them preserves render history.
-- [/api/render/edit/route.ts](app/api/render/edit/route.ts) is still a 501 stub from Session 6's conversational-edit plan.
-- `PHASE-2-SCOPE.md` is written in RoomSpec-era language and has not been revised.
+- Conversational edit is live: [/api/render/edit/route.ts](app/api/render/edit/route.ts) calls [runEditPipeline](lib/render/pipeline.ts) and the studio surfaces it via the "Apply edit" textarea in [render-canvas.tsx](components/mockup-studio/render-canvas.tsx). A singular-fixture rule was added to the Sonnet system prompt in [lib/claude/prompts.ts](lib/claude/prompts.ts) after an observed duplicate-refrigerator render.
+- `PHASE-2-SCOPE.md` is written in RoomSpec-era language; the top banner flags this but the stage sections have not been rewritten.
 - Render quality could benefit from a Claude-vision pre-step that describes the before-photo before Sonnet writes the prompt (the REMOVE FROM ORIGINAL section is currently written blind since Sonnet doesn't see the photo). Product upgrade, not a bug.
