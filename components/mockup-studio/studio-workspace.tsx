@@ -268,7 +268,10 @@ export function StudioWorkspace({
         />
       </div>
       <div className="col-span-6 flex min-h-0 flex-col gap-4">
-        <MoodboardPanel images={moodboardImages} />
+        <MoodboardPanel
+          images={moodboardImages}
+          briefHref={`/properties/${propertyId}/rooms/${roomId}/brief`}
+        />
         <div className="min-h-0 flex-1">
           {!hasBrief ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
