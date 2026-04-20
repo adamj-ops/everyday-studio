@@ -223,7 +223,7 @@ Stop and confirm with the owner if the next agent proposes any of these. All out
 - API routes: new [theme](app/api/properties/[id]/theme/route.ts), [brief](app/api/rooms/[id]/brief/route.ts), [brief history](app/api/rooms/[id]/brief/history/route.ts), [moodboard upload-sign](app/api/rooms/[id]/moodboard/upload-sign/route.ts), [moodboard sign-view](app/api/rooms/[id]/moodboard/sign-view/route.ts). Updated `/api/render/generate` and `/api/renders/[id]/review` to load via the shared [loadPromptInput](lib/briefs/load.ts).
 - UI: new theme picker at `/properties/[id]/theme` ([ThemeForm](components/theme/theme-form.tsx)), brief form at `/properties/[id]/rooms/[roomId]/brief` ([BriefForm](components/brief/brief-form.tsx)), dismissible [ThemeNudgeBanner](components/theme/theme-nudge-banner.tsx) on the property page, studio sidebar swapped to [BriefSidebar](components/mockup-studio/brief-sidebar.tsx).
 - Retired: `lib/specs/*`, `lib/claude/suggest.ts`, `components/specs/*`, `components/room-spec-form.tsx`, `/api/rooms/[id]/spec/*`, `/api/references/route.ts`, `/properties/[id]/rooms/[roomId]/spec/page.tsx`. Moved 4 of the original 5 fixtures to `test-fixtures/_legacy/` (excluded from tsc).
-- Preserved: all of Session 6 (the render pipeline, mockup studio shell, conversational-edit stub). Session 7 only replaces the input shape.
+- Preserved: all of Session 6 (the render pipeline, mockup studio shell, conversational edit flow wired to `/api/render/edit`). Session 7 only replaces the input shape.
 
 **Follow-up in this session:**
 
@@ -237,3 +237,24 @@ Stop and confirm with the owner if the next agent proposes any of these. All out
 - Conversational edit is live: [/api/render/edit/route.ts](app/api/render/edit/route.ts) calls [runEditPipeline](lib/render/pipeline.ts) and the studio surfaces it via the "Apply edit" textarea in [render-canvas.tsx](components/mockup-studio/render-canvas.tsx). A singular-fixture rule was added to the Sonnet system prompt in [lib/claude/prompts.ts](lib/claude/prompts.ts) after an observed duplicate-refrigerator render.
 - `PHASE-2-SCOPE.md` is written in RoomSpec-era language; the top banner flags this but the stage sections have not been rewritten.
 - Render quality could benefit from a Claude-vision pre-step that describes the before-photo before Sonnet writes the prompt (the REMOVE FROM ORIGINAL section is currently written blind since Sonnet doesn't see the photo). Product upgrade, not a bug.
+
+---
+
+## Session 8 — Foundation: hygiene, download, render quality, design spec — COMPLETE
+
+**Goal:** Ship production hygiene (no leaked DB errors to JSON clients, photo signing visibility, Storage rollback + EXIF strip), a studio download button with stable filenames, stronger Sonnet prompt rules for duplicate appliances + layout drift, and an internal design spec for Sessions 9–11.
+
+**What changed:**
+
+- **API responses:** [`lib/api/internal-error.ts`](lib/api/internal-error.ts) pattern — `app/api/**` routes log with `console.error` and return `{ error: "internal_error", code: "<stable_id>" }` instead of raw `PostgrestError` / exception messages. [`app/api/render/generate/route.ts`](app/api/render/generate/route.ts) and [`app/api/render/edit/route.ts`](app/api/render/edit/route.ts) no longer echo `detail` with internal text on synchronous failures.
+- **Property page:** [`app/properties/[id]/page.tsx`](app/properties/[id]/page.tsx) logs `signPhotoUrls` failures and shows a one-line amber banner when signing fails.
+- **Photo finalize:** [`app/api/properties/[id]/photos/route.ts`](app/api/properties/[id]/photos/route.ts) uses [`createAdminClient`](lib/supabase/admin.ts) + [`lib/photos/strip-metadata.ts`](lib/photos/strip-metadata.ts) (`sharp`) to re-encode each uploaded object in place (strips EXIF/GPS). On `property_photos` insert failure, removes uploaded paths from the `property-photos` bucket.
+- **Studio download:** [`components/mockup-studio/render-canvas.tsx`](components/mockup-studio/render-canvas.tsx) — Download button; filename `{addressSlug}_{roomTypeSlug}_{ordinal}.png` via [`lib/properties/slug.ts`](lib/properties/slug.ts). [`app/api/renders/[id]/route.ts`](app/api/renders/[id]/route.ts) returns `ordinal` (count of renders for the room with `created_at` ≤ this row) so polled clients stay accurate after generate/edit.
+- **Prompts:** [`lib/claude/prompts.ts`](lib/claude/prompts.ts) — explicit **ROOM LAYOUT PRESERVATION** and **CRITICAL SINGULAR FIXTURE RULE** blocks; enumeration is derived from non-negotiables + `base_photo_description` text. [`components/brief/non-negotiables.tsx`](components/brief/non-negotiables.tsx) asks designers to list existing major fixtures.
+- **Tooling:** [`package.json`](package.json) — `npm run lint` (ESLint 8 + `eslint-config-next@14`), `npm run typecheck`. [`.eslintrc.json`](.eslintrc.json) extends `next/core-web-vitals`. Dependency: `sharp`.
+- **Docs:** [`docs/design-spec.md`](docs/design-spec.md) (tokens, components, pages, interactions, anti-patterns). [`CHANGELOG.md`](CHANGELOG.md) Session 8 entry.
+
+**Validation:**
+
+- `npm run typecheck`, `npm run lint`, `npm run build` — pass.
+- **Render E2E (`tsx scripts/run-render-e2e.ts <room_id> <base_photo_id>`):** not executed in the agent environment (no `ANTHROPIC_API_KEY` / live spend). **Operator:** run against the Vincent Ave kitchen fixture after deploy; compare `test-fixtures/e2e-run-*.png` to prior output. If duplicate fridges or layout drift persist, treat as **Gemini interpretation limits** — prompt-only fixes may be insufficient; prioritize the vision pre-step ([HANDOFF.md](HANDOFF.md) debt).
