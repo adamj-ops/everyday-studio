@@ -123,7 +123,13 @@ export default async function PropertyPage({
             )}
           </dl>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/properties/${property.id}/handoff`}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            Handoff
+          </Link>
           <Link
             href={`/properties/${property.id}/theme`}
             className={buttonVariants({ variant: "outline", size: "sm" })}
