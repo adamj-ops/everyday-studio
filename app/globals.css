@@ -159,3 +159,39 @@
     font-feature-settings: "liga" 1;
   }
 }
+
+/* GC handoff — print layout (scoped to [data-handoff-page]) */
+@media print {
+  @page {
+    margin: 0.5in;
+    size: letter;
+  }
+
+  body:has([data-handoff-page]) > header {
+    display: none !important;
+  }
+
+  body:has([data-handoff-page]) > main {
+    max-width: none;
+    padding: 0;
+    padding-bottom: 0;
+  }
+
+  body:has([data-handoff-page]) [data-handoff-page] {
+    max-width: 7.5in;
+    margin-left: auto;
+    margin-right: auto;
+    font-family: var(--font-geist-sans, ui-sans-serif, system-ui, sans-serif);
+    line-height: 1.65;
+  }
+
+  body:has([data-handoff-page]) [data-handoff-page] img {
+    max-width: 100% !important;
+    height: auto !important;
+    page-break-inside: avoid;
+  }
+
+  body:has([data-handoff-page]) .handoff-room {
+    page-break-inside: avoid;
+  }
+}
