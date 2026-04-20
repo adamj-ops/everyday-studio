@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { z } from "zod";
+import { internalError } from "@/lib/api/internal-error";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runEditPipeline, PipelineParseError } from "@/lib/render/pipeline";
@@ -45,16 +46,13 @@ export async function POST(req: NextRequest) {
     .eq("id", parentId)
     .maybeSingle();
   if (parentErr) {
-    return NextResponse.json({ error: parentErr.message }, { status: 500 });
+    return internalError("edit_parent_lookup", parentErr);
   }
   if (!parent) {
     return NextResponse.json({ error: "parent_not_found" }, { status: 404 });
   }
   if (!parent.storage_path) {
-    return NextResponse.json(
-      { error: "parent_has_no_image", detail: "nothing to edit" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "parent_has_no_image" }, { status: 400 });
   }
 
   // Load the current brief + theme for the optional Opus image-review step.
@@ -74,8 +72,9 @@ export async function POST(req: NextRequest) {
     .from(RENDERS_BUCKET)
     .download(parent.storage_path);
   if (downloadErr || !parentBlob) {
+    console.error("[edit_parent_download]", downloadErr);
     return NextResponse.json(
-      { error: "parent_download_failed", detail: downloadErr?.message ?? "no data" },
+      { error: "internal_error", code: "edit_parent_download" },
       { status: 500 },
     );
   }
@@ -110,10 +109,7 @@ export async function POST(req: NextRequest) {
     .select("id")
     .single();
   if (insertErr || !childRow) {
-    return NextResponse.json(
-      { error: "insert_failed", detail: insertErr?.message },
-      { status: 500 },
-    );
+    return internalError("edit_render_insert", insertErr ?? new Error("no_row"));
   }
   const renderId: string = childRow.id;
 

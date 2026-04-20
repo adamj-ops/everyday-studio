@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { internalError } from "@/lib/api/internal-error";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runImageReview } from "@/lib/render/pipeline";
@@ -33,16 +34,13 @@ export async function POST(
     .eq("id", renderId)
     .maybeSingle();
   if (renderErr) {
-    return NextResponse.json({ error: renderErr.message }, { status: 500 });
+    return internalError("review_render_lookup", renderErr);
   }
   if (!render) {
     return NextResponse.json({ error: "render_not_found" }, { status: 404 });
   }
   if (!render.storage_path) {
-    return NextResponse.json(
-      { error: "render_has_no_image", detail: "nothing to review" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "render_has_no_image" }, { status: 400 });
   }
 
   // Rebuild the prompt input from the current latest brief (not the brief
@@ -59,7 +57,7 @@ export async function POST(
     if (loaded.error === "room_not_found" || loaded.error === "property_not_found") {
       return NextResponse.json({ error: loaded.error }, { status: 404 });
     }
-    return NextResponse.json({ error: loaded.error }, { status: 500 });
+    return internalError("review_load_prompt_input", new Error(loaded.error));
   }
 
   const admin = createAdminClient();
@@ -67,8 +65,9 @@ export async function POST(
     .from(RENDERS_BUCKET)
     .download(render.storage_path);
   if (downloadErr || !blob) {
+    console.error("[review_image_download]", downloadErr);
     return NextResponse.json(
-      { error: "image_download_failed", detail: downloadErr?.message ?? "no data" },
+      { error: "internal_error", code: "review_image_download" },
       { status: 500 },
     );
   }
@@ -100,9 +99,9 @@ export async function POST(
 
     return NextResponse.json({ render_id: renderId, review });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    console.error("[review_image_review]", err);
     return NextResponse.json(
-      { error: "image_review_failed", detail: message.slice(0, 500) },
+      { error: "internal_error", code: "image_review_failed" },
       { status: 502 },
     );
   }

@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { internalError } from "@/lib/api/internal-error";
 import { createClient } from "@/lib/supabase/server";
 
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -63,7 +64,7 @@ export async function POST(
     .eq("id", roomId)
     .maybeSingle();
   if (roomErr) {
-    return NextResponse.json({ error: roomErr.message }, { status: 500 });
+    return internalError("moodboard_upload_sign_room", roomErr);
   }
   if (!room) {
     return NextResponse.json({ error: "room_not_found" }, { status: 404 });
@@ -105,9 +106,9 @@ export async function POST(
     .createSignedUploadUrl(storagePath);
 
   if (error || !data) {
-    return NextResponse.json(
-      { error: error?.message ?? "sign_failed" },
-      { status: 500 },
+    return internalError(
+      "moodboard_upload_sign_storage",
+      error ?? new Error("missing_upload_data"),
     );
   }
 

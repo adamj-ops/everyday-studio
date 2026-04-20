@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { internalError } from "@/lib/api/internal-error";
 import { createClient } from "@/lib/supabase/server";
 
 // TODO(phase-2): rate-limit this endpoint. Currently safe because:
@@ -64,7 +65,7 @@ export async function POST(
     .eq("id", propertyId)
     .maybeSingle();
   if (propertyError) {
-    return NextResponse.json({ error: propertyError.message }, { status: 500 });
+    return internalError("photos_sign_property_lookup", propertyError);
   }
   if (!property) {
     return NextResponse.json({ error: "property_not_found" }, { status: 404 });
@@ -83,10 +84,7 @@ export async function POST(
       .from("property-photos")
       .createSignedUploadUrl(storagePath);
     if (error || !data) {
-      return NextResponse.json(
-        { error: error?.message ?? "sign_failed" },
-        { status: 500 },
-      );
+      return internalError("photos_sign_upload_url", error ?? new Error("missing_upload_data"));
     }
     uploads.push({
       filename: file.filename,

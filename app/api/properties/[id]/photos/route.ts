@@ -1,9 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { internalError } from "@/lib/api/internal-error";
+import { stripExifOverwrite } from "@/lib/photos/strip-metadata";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { RoomTypeEnum } from "@/lib/briefs/room-types";
 
 const PropertyIdSchema = z.string().uuid();
+
+const PROPERTY_PHOTOS_BUCKET = "property-photos";
 
 const PhotoEntry = z.object({
   storage_path: z.string().min(1),
@@ -46,7 +51,7 @@ export async function POST(
     .eq("id", propertyId)
     .maybeSingle();
   if (propertyError) {
-    return NextResponse.json({ error: propertyError.message }, { status: 500 });
+    return internalError("photos_finalize_property_lookup", propertyError);
   }
   if (!property) {
     return NextResponse.json({ error: "property_not_found" }, { status: 404 });
@@ -62,6 +67,20 @@ export async function POST(
       { error: "storage_path_mismatch", storage_path: invalid.storage_path },
       { status: 400 },
     );
+  }
+
+  const admin = createAdminClient();
+  const uniquePaths = [...new Set(parsed.data.photos.map((p) => p.storage_path))];
+
+  for (const storagePath of uniquePaths) {
+    const stripped = await stripExifOverwrite(admin, storagePath);
+    if (!stripped.ok) {
+      console.error("[photos_finalize_strip_exif]", storagePath, stripped.error);
+      return NextResponse.json(
+        { error: "internal_error", code: "photos_strip_exif_failed" },
+        { status: 500 },
+      );
+    }
   }
 
   // Upsert unique rooms for the (property, room_type, label) combos in the batch.
@@ -83,7 +102,7 @@ export async function POST(
       onConflict: "property_id,room_type,label",
     });
   if (roomsError) {
-    return NextResponse.json({ error: roomsError.message }, { status: 500 });
+    return internalError("photos_finalize_rooms_upsert", roomsError);
   }
 
   const rows = parsed.data.photos.map((p) => ({
@@ -97,7 +116,15 @@ export async function POST(
     .insert(rows)
     .select();
   if (photosError) {
-    return NextResponse.json({ error: photosError.message }, { status: 500 });
+    console.error("[photos_finalize_insert]", photosError);
+    const { error: removeErr } = await admin.storage.from(PROPERTY_PHOTOS_BUCKET).remove(uniquePaths);
+    if (removeErr) {
+      console.error("[photos_finalize_rollback_storage]", removeErr);
+    }
+    return NextResponse.json(
+      { error: "internal_error", code: "photos_finalize_insert_failed" },
+      { status: 500 },
+    );
   }
 
   // Touch parent property so dashboard ordering surfaces recently-edited rows.

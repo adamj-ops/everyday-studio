@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { internalError } from "@/lib/api/internal-error";
 import { createClient } from "@/lib/supabase/server";
 import { CreateRoomInput } from "@/lib/briefs/room-types";
 
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
     .eq("id", parsed.data.property_id)
     .maybeSingle();
   if (propertyError) {
-    return NextResponse.json({ error: propertyError.message }, { status: 500 });
+    return internalError("rooms_property_lookup", propertyError);
   }
   if (!property) {
     return NextResponse.json({ error: "property_not_found" }, { status: 404 });
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
     .upsert(parsed.data, { onConflict: "property_id,room_type,label" })
     .select()
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError("rooms_upsert", error);
 
   return NextResponse.json({ room: data }, { status: 201 });
 }

@@ -17,7 +17,9 @@ export function NonNegotiables({
       </Label>
       <p className="text-pretty text-sm text-muted-foreground">
         What must appear. What must NOT appear. The renderer treats these as hard
-        constraints.
+        constraints. For kitchens and baths, briefly list what already exists (e.g.
+        one refrigerator, one range, one sink) so the AI does not duplicate
+        appliances — you can see the photo; the prompt engine cannot.
       </p>
       <Textarea
         id="non-negotiables"

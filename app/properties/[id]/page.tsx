@@ -64,11 +64,16 @@ export default async function PropertyPage({
     }
   }
 
+  let photoUrlsSignFailed = false;
   const signedUrls = photos.length
     ? await signPhotoUrls(
         supabase,
         photos.map((p) => p.storage_path),
-      ).catch(() => ({}) as Record<string, string>)
+      ).catch((err) => {
+        console.error("[signPhotoUrls]", err);
+        photoUrlsSignFailed = true;
+        return {} as Record<string, string>;
+      })
     : {};
 
   return (
@@ -142,6 +147,11 @@ export default async function PropertyPage({
 
       <section>
         <h2 className="mb-4 text-lg font-medium">Photos</h2>
+        {photoUrlsSignFailed ? (
+          <p className="mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-foreground">
+            Some photos couldn&apos;t be loaded — refresh the page to retry.
+          </p>
+        ) : null}
         <PhotoGrid photos={photos} rooms={rooms} signedUrls={signedUrls} />
       </section>
 

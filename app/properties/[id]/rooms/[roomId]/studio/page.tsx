@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { slugifyAddress, slugifyRoomType } from "@/lib/properties/slug";
 import { signStorageUrls } from "@/lib/supabase/signed-urls";
 import { StudioWorkspace } from "@/components/mockup-studio/studio-workspace";
 import type { MoodboardImageItem } from "@/components/mockup-studio/moodboard-panel";
@@ -87,6 +88,12 @@ export default async function MockupStudioPage({
   const renderRow = renderResult.data;
   let initialRender: Parameters<typeof StudioWorkspace>[0]["initialRender"] = null;
   if (renderRow) {
+    const { count: versionOrdinal } = await supabase
+      .from("renders")
+      .select("*", { count: "exact", head: true })
+      .eq("room_id", roomId)
+      .lte("created_at", renderRow.created_at);
+    const v = versionOrdinal ?? 1;
     let signedUrl: string | null = null;
     if (renderRow.storage_path) {
       const urls = await signStorageUrls(
@@ -104,6 +111,7 @@ export default async function MockupStudioPage({
       opus_verdict: renderRow.opus_verdict,
       opus_critiques_json: renderRow.opus_critiques_json,
       created_at: renderRow.created_at,
+      ordinal: v,
     };
   }
 
@@ -166,6 +174,10 @@ export default async function MockupStudioPage({
         basePhotoId={basePhoto?.id ?? null}
         moodboardImages={moodboardImages}
         initialRender={initialRender}
+        downloadFileParts={{
+          addressSlug: slugifyAddress(property.address),
+          roomTypeSlug: slugifyRoomType(room.room_type),
+        }}
       />
     </div>
   );

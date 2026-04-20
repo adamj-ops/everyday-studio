@@ -17,6 +17,7 @@ type InitialRender = {
   opus_verdict: string | null;
   opus_critiques_json: unknown;
   created_at: string;
+  ordinal?: number;
 } | null;
 
 export type StudioWorkspaceProps = {
@@ -29,6 +30,7 @@ export type StudioWorkspaceProps = {
   basePhotoId: string | null;
   moodboardImages: MoodboardImageItem[];
   initialRender: InitialRender;
+  downloadFileParts: { addressSlug: string; roomTypeSlug: string };
 };
 
 type RenderState = {
@@ -36,6 +38,7 @@ type RenderState = {
   status: string;
   signedUrl: string | null;
   createdAt: string;
+  ordinal: number;
   imageReview: RenderReviewOutput | null;
   promptReview: PromptReviewOutput | null;
   errorMessage: string | null;
@@ -60,6 +63,7 @@ export function StudioWorkspace({
   basePhotoId,
   moodboardImages,
   initialRender,
+  downloadFileParts,
 }: StudioWorkspaceProps) {
   const hasBrief = brief !== null;
   const [render, setRender] = useState<RenderState | null>(
@@ -95,6 +99,7 @@ export function StudioWorkspace({
       opus_critiques_json: unknown;
       created_at: string;
       error_message: string | null;
+      ordinal?: number;
     };
   }, []);
 
@@ -106,6 +111,7 @@ export function StudioWorkspace({
         status: body.status,
         signedUrl: body.signed_url,
         createdAt: body.created_at,
+        ordinal: body.ordinal ?? 1,
         imageReview,
         promptReview,
         errorMessage: body.error_message,
@@ -199,6 +205,7 @@ export function StudioWorkspace({
         status: "pending",
         signedUrl: null,
         createdAt: new Date().toISOString(),
+        ordinal: 1,
         imageReview: null,
         promptReview: null,
         errorMessage: null,
@@ -255,6 +262,7 @@ export function StudioWorkspace({
           status: "pending",
           signedUrl: null,
           createdAt: new Date().toISOString(),
+          ordinal: 1,
           imageReview: null,
           promptReview: null,
           errorMessage: null,
@@ -299,6 +307,7 @@ export function StudioWorkspace({
       status: render.status,
       signedUrl: render.signedUrl,
       createdAt: render.createdAt,
+      ordinal: render.ordinal,
     };
   }, [render]);
 
@@ -340,6 +349,7 @@ export function StudioWorkspace({
             <RenderCanvas
               roomId={roomId}
               initialRender={canvasInitial}
+              downloadFileParts={downloadFileParts}
               hasBasePhoto={Boolean(basePhotoId)}
               hasBrief={hasBrief}
               submitting={submitting}
@@ -376,6 +386,7 @@ function toRenderState(initial: NonNullable<InitialRender>): RenderState {
     status: initial.status,
     signedUrl: initial.signed_url,
     createdAt: initial.created_at,
+    ordinal: initial.ordinal ?? 1,
     imageReview,
     promptReview,
     errorMessage: null,

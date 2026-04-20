@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { internalError } from "@/lib/api/internal-error";
 import { createClient } from "@/lib/supabase/server";
 import { signStorageUrls } from "@/lib/supabase/signed-urls";
 
@@ -48,9 +49,6 @@ export async function POST(
     const urls = await signStorageUrls(supabase, "property-references", safePaths);
     return NextResponse.json({ urls });
   } catch (err) {
-    return NextResponse.json(
-      { error: "sign_failed", detail: err instanceof Error ? err.message : "" },
-      { status: 500 },
-    );
+    return internalError("moodboard_sign_view", err);
   }
 }

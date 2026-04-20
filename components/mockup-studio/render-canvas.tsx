@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import Image from "next/image";
-import { Loader2, RefreshCcw } from "lucide-react";
+import { Download, Loader2, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +15,9 @@ export interface RenderCanvasProps {
     status: string;
     signedUrl: string | null;
     createdAt: string;
+    ordinal: number;
   } | null;
+  downloadFileParts: { addressSlug: string; roomTypeSlug: string };
   hasBasePhoto: boolean;
   hasBrief: boolean;
   submitting: boolean;
@@ -34,7 +36,9 @@ const IN_FLIGHT_STATES = new Set([
 ]);
 
 export function RenderCanvas({
+  roomId: _roomId,
   initialRender,
+  downloadFileParts,
   hasBasePhoto,
   hasBrief,
   submitting,
@@ -45,6 +49,7 @@ export function RenderCanvas({
   onApplyEdit,
 }: RenderCanvasProps) {
   const [editInstruction, setEditInstruction] = useState("");
+  const [downloading, setDownloading] = useState(false);
   const editInstructionId = useId();
   const render = initialRender;
   const inFlight =
@@ -54,6 +59,31 @@ export function RenderCanvas({
   const canGenerate = hasBasePhoto && hasBrief && !inFlight;
   const canEdit =
     Boolean(render?.signedUrl) && !inFlight && render?.status !== "failed";
+  const canDownload = Boolean(render?.signedUrl) && !downloading;
+
+  const onDownload = () => {
+    if (!render?.signedUrl) return;
+    const filename = `${downloadFileParts.addressSlug}_${downloadFileParts.roomTypeSlug}_${render.ordinal}.png`;
+    setDownloading(true);
+    void (async () => {
+      try {
+        const res = await fetch(render.signedUrl!);
+        if (!res.ok) throw new Error("download_failed");
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.rel = "noopener";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } finally {
+        setDownloading(false);
+      }
+    })();
+  };
 
   return (
     <section className="flex h-full flex-col gap-4 rounded-xl border p-4">
@@ -62,11 +92,26 @@ export function RenderCanvas({
           <p className="text-xs text-muted-foreground">Render</p>
           <h2 className="text-sm font-medium">Mockup canvas</h2>
         </div>
-        {render ? (
-          <Badge variant={statusVariant(render.status)}>
-            {statusLabel(render.status)}
-          </Badge>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {render && canDownload ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => onDownload()}
+              aria-label="Download render image"
+            >
+              <Download className="size-4 shrink-0" />
+              Download
+            </Button>
+          ) : null}
+          {render ? (
+            <Badge variant={statusVariant(render.status)}>
+              {statusLabel(render.status)}
+            </Badge>
+          ) : null}
+        </div>
       </header>
 
       <div

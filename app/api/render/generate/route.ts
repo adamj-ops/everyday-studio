@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { z } from "zod";
+import { internalError } from "@/lib/api/internal-error";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { supabaseStorageReader } from "@/lib/gemini/references";
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
     if (loaded.error === "no_brief_for_room") {
       return NextResponse.json({ error: "no_brief_for_room" }, { status: 400 });
     }
-    return NextResponse.json({ error: loaded.error }, { status: 500 });
+    return internalError("generate_load_prompt_input", new Error(loaded.error));
   }
 
   // Confirm the photo belongs to the same property as the room's brief.
@@ -99,8 +100,9 @@ export async function POST(req: NextRequest) {
     .from(PROPERTY_PHOTOS_BUCKET)
     .download(photoRow.storage_path);
   if (basePhotoErr || !basePhotoBlob) {
+    console.error("[generate_base_photo_download]", basePhotoErr);
     return NextResponse.json(
-      { error: "base_photo_download_failed", detail: basePhotoErr?.message ?? "no data" },
+      { error: "internal_error", code: "generate_base_photo_download" },
       { status: 500 },
     );
   }
@@ -120,11 +122,12 @@ export async function POST(req: NextRequest) {
       const { mimeType, dataBase64 } = await reader.read(ref.storage_path);
       moodboardImages.push({ mimeType, dataBase64 });
     } catch (err) {
+      console.error("[generate_reference_download]", ref.storage_path, err);
       return NextResponse.json(
         {
-          error: "reference_download_failed",
+          error: "internal_error",
+          code: "generate_reference_download",
           storage_path: ref.storage_path,
-          detail: err instanceof Error ? err.message : String(err),
         },
         { status: 500 },
       );
@@ -146,10 +149,7 @@ export async function POST(req: NextRequest) {
     .select("id")
     .single();
   if (insertErr || !renderRow) {
-    return NextResponse.json(
-      { error: "insert_failed", detail: insertErr?.message },
-      { status: 500 },
-    );
+    return internalError("generate_render_insert", insertErr ?? new Error("no_row"));
   }
   const renderId: string = renderRow.id;
   const propertyId = photoRow.property_id;

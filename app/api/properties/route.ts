@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { internalError } from "@/lib/api/internal-error";
 import { createClient } from "@/lib/supabase/server";
 import { CreatePropertyInput } from "@/lib/properties/property";
 
@@ -13,7 +14,7 @@ export async function GET() {
     .from("properties")
     .select("*")
     .order("updated_at", { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError("properties_list", error);
 
   return NextResponse.json({ properties: data });
 }
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
     .insert({ ...parsed.data, owner_id: user.id })
     .select()
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError("properties_insert", error);
 
   return NextResponse.json({ property: data }, { status: 201 });
 }

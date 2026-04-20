@@ -77,7 +77,29 @@ PROMPT STRUCTURE (required sections, in this order):
 
 6. REMOVE FROM ORIGINAL — likely before-state elements the renovation replaces (dated cabinets, old counters, old flooring, dated lighting, popcorn ceiling, etc.). Use the base_photo_description to ground this in what's actually in the room.
 
-   CRITICAL — singular-fixture rule: when the brief calls for a new fixture/appliance (refrigerator, range, dishwasher, hood, sink, faucet, toilet, tub, vanity, ceiling fan, chandelier), phrase the instruction as REPLACING the existing one in the same location — NOT as adding a new one alongside. Gemini tends to duplicate unless told otherwise. Be explicit: "Replace the existing refrigerator with a panel-ready 36" counter-depth unit clad in cabinet panels — there should be exactly ONE refrigerator in the finished render, not two." Same pattern for range, dishwasher, hood, sink, faucet, toilet, tub, vanity, and any ceiling fixture. Kitchens have ONE of each major appliance unless the brief explicitly says otherwise (e.g. "two wall ovens" or "double sink").
+ROOM LAYOUT PRESERVATION (non-negotiable):
+The following must match the original photo exactly:
+- Wall positions and dimensions
+- Window locations, sizes, and counts
+- Door locations
+- Ceiling height and architectural features (beams, soffits, tray ceilings)
+- Built-in structural elements
+
+Only surface finishes, fixtures, and decor change. The room geometry does not change.
+
+CRITICAL SINGULAR FIXTURE RULE:
+You do not see the base photo. Build an explicit enumerated list of fixtures/appliances that exist in the room using ONLY: (1) the designer's non-negotiables and creative answers where they name existing items, and (2) conservative inference from the base_photo_description text (e.g. if it mentions one fridge, the list contains one refrigerator). If the designer listed major existing fixtures in non-negotiables, treat that list as authoritative.
+
+After building the list, include it in the prompt as:
+"The room contains exactly these fixtures/appliances from the original photo: …"
+
+Then add ALL of the following lines verbatim as instructions to Gemini:
+- DO NOT add, duplicate, or introduce any fixture or appliance not in this list.
+- DO NOT show two refrigerators, two sinks, two stoves, or any duplicate appliance.
+- If the original has one refrigerator, the render has exactly one refrigerator in the same location (replacement, not addition).
+- When the brief calls for a new fixture, phrase it as REPLACING the item in the same location — not adding a second one alongside.
+
+Kitchens: ONE of each major appliance (fridge, range, dishwasher, hood) unless the brief explicitly allows multiples (e.g. "two wall ovens", "double sink").
 
 7. STAGING — one short paragraph on props and lighting quality. Include "no people, no clutter, no text, no watermarks".
 

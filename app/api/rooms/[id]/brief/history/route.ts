@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { internalError } from "@/lib/api/internal-error";
 import { createClient } from "@/lib/supabase/server";
 
 const RoomIdSchema = z.string().uuid();
@@ -28,7 +29,7 @@ export async function GET(
     .order("version", { ascending: false });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return internalError("room_brief_history", error);
   }
 
   return NextResponse.json({ versions: data ?? [] });

@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { internalError } from "@/lib/api/internal-error";
 import { createClient } from "@/lib/supabase/server";
 import { PatchPropertyInput } from "@/lib/properties/property";
 
@@ -25,7 +26,7 @@ export async function GET(
     .select("*")
     .eq("id", id)
     .maybeSingle();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError("property_get", error);
   if (!data) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
   return NextResponse.json({ property: data });
@@ -61,7 +62,7 @@ export async function PATCH(
     .eq("id", id)
     .select()
     .maybeSingle();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return internalError("property_patch", error);
   if (!data) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
   return NextResponse.json({ property: data });

@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { internalError } from "@/lib/api/internal-error";
 import { createClient } from "@/lib/supabase/server";
 import { signStorageUrls } from "@/lib/supabase/signed-urls";
 
@@ -32,11 +33,17 @@ export async function GET(
     .eq("id", id)
     .maybeSingle();
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return internalError("render_get", error);
   }
   if (!render) {
     return NextResponse.json({ error: "render_not_found" }, { status: 404 });
   }
+
+  const { count: ordinal } = await supabase
+    .from("renders")
+    .select("*", { count: "exact", head: true })
+    .eq("room_id", render.room_id)
+    .lte("created_at", render.created_at);
 
   let signedUrl: string | null = null;
   if (render.storage_path) {
@@ -63,5 +70,6 @@ export async function GET(
     error_message: render.error_message,
     cost_estimate_cents: render.cost_estimate_cents,
     created_at: render.created_at,
+    ordinal: ordinal ?? 1,
   });
 }

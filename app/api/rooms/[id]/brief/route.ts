@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { internalError } from "@/lib/api/internal-error";
 import { createClient } from "@/lib/supabase/server";
 import { RoomBriefSchema } from "@/lib/briefs/schema";
 
@@ -31,7 +32,7 @@ export async function GET(
     .maybeSingle();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return internalError("room_brief_get", error);
   }
 
   return NextResponse.json({ brief: data ?? null });
@@ -70,7 +71,7 @@ export async function PUT(
     .maybeSingle();
 
   if (latestErr) {
-    return NextResponse.json({ error: latestErr.message }, { status: 500 });
+    return internalError("room_brief_latest_version", latestErr);
   }
 
   // No prior brief + no room row visible under RLS = not found.
@@ -102,7 +103,7 @@ export async function PUT(
     .single();
 
   if (insertErr) {
-    return NextResponse.json({ error: insertErr.message }, { status: 500 });
+    return internalError("room_brief_insert", insertErr);
   }
 
   return NextResponse.json({ brief: inserted }, { status: 201 });

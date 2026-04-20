@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { internalError } from "@/lib/api/internal-error";
 import { createClient } from "@/lib/supabase/server";
 import { ProjectThemeSchema } from "@/lib/briefs/schema";
 
@@ -29,7 +30,7 @@ export async function GET(
     .maybeSingle();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return internalError("project_theme_get", error);
   }
 
   return NextResponse.json({ theme: data ?? null });
@@ -88,7 +89,7 @@ export async function POST(
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return internalError("project_theme_upsert", error);
   }
 
   return NextResponse.json({ theme: data }, { status: 200 });
