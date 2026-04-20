@@ -4,12 +4,13 @@ Pick up here. Complements [CLAUDE.md](CLAUDE.md) (rules), [AGENTS.md](AGENTS.md)
 
 ## Current focus
 
-Phase 1 through **Session 8** (hygiene, download, prompt hardening, design spec). Moodboard-driven flow:
+Phase 1 through **Session 9** (GC handoff / print document). Moodboard-driven flow:
 
 1. Property created → optional theme nudge banner appears.
 2. **Theme** at [`/properties/[id]/theme`](app/properties/[id]/theme/page.tsx) — budget tier + aesthetic preset, one row per property.
 3. **Brief** at [`/properties/[id]/rooms/[roomId]/brief`](app/properties/[id]/rooms/[roomId]/brief/page.tsx) — moodboard uploads per category + creative answers + non-negotiables, versioned.
 4. **Studio** at [`/properties/[id]/rooms/[roomId]/studio`](app/properties/[id]/rooms/[roomId]/studio/page.tsx) — render, Opus review, conversational edit, **download PNG** (filename uses address slug + room type + render ordinal).
+5. **Handoff** at [`/properties/[id]/handoff`](app/properties/[id]/handoff/page.tsx) — printable contractor / investor summary; **Download PDF** uses the browser print dialog (Save as PDF).
 
 Retired: `lib/specs/*`, per-field Suggest, Spec Builder UI, legacy `/api/rooms/[id]/spec/*` and `/api/references`. `room_specs` and `reference_materials` tables stay in DB for history.
 
@@ -44,6 +45,7 @@ CLI helpers:
 
 | Path | Purpose |
 |---|---|
+| [`/properties/[id]/handoff`](app/properties/[id]/handoff/page.tsx) | GC / investor handoff document (print-to-PDF) |
 | [`/api/properties/[id]/theme`](app/api/properties/[id]/theme/route.ts) | GET / POST project theme |
 | [`/api/properties/[id]/photos`](app/api/properties/[id]/photos/route.ts) | POST finalize before-photos into `property_photos` |
 | [`/api/properties/[id]/photos/sign`](app/api/properties/[id]/photos/sign/route.ts) | POST signed upload URLs for before-photos; rate-limit TODO in route |
@@ -90,7 +92,7 @@ Studio UI: [`components/mockup-studio/studio-workspace.tsx`](components/mockup-s
 
 ## Plausible next tasks
 
-1. **Sessions 9–11 (parallel):** GC handoff page, favorites system, design elevation — follow [`docs/design-spec.md`](docs/design-spec.md).
+1. **Sessions 10–11 (parallel):** favorites system, design elevation — follow [`docs/design-spec.md`](docs/design-spec.md). (Session 9 handoff shipped.)
 2. Rewrite [`PHASE-2-SCOPE.md`](PHASE-2-SCOPE.md) Stage 1 to reflect `room_briefs` is already the moodboard surface; re-check Stages 4–6 against current schema.
 3. Add a Claude-vision pre-step for before-photo description feeding into Sonnet.
 4. Harden E2E automation: Playwright flow from property creation → theme → brief → render (existing [`scripts/run-render-e2e.ts`](scripts/run-render-e2e.ts) covers pipeline only, not UI).

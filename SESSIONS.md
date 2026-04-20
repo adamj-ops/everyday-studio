@@ -258,3 +258,26 @@ Stop and confirm with the owner if the next agent proposes any of these. All out
 
 - `npm run typecheck`, `npm run lint`, `npm run build` — pass.
 - **Render E2E (`tsx scripts/run-render-e2e.ts <room_id> <base_photo_id>`):** not executed in the agent environment (no `ANTHROPIC_API_KEY` / live spend). **Operator:** run against the Vincent Ave kitchen fixture after deploy; compare `test-fixtures/e2e-run-*.png` to prior output. If duplicate fridges or layout drift persist, treat as **Gemini interpretation limits** — prompt-only fixes may be insufficient; prioritize the vision pre-step ([HANDOFF.md](HANDOFF.md) debt).
+
+---
+
+## Session 9 — GC handoff page (print / investor PDF) — COMPLETE
+
+**Goal:** Single document route for contractor handoff and investor deck export: property + theme header, design-direction summary, per-room before/render pairs, creative Q&A, non-negotiables, moodboard thumbnails. No materials list, budget tables, or timeline (separate portal).
+
+**What shipped:**
+
+- **Route:** [`app/properties/[id]/handoff/page.tsx`](app/properties/[id]/handoff/page.tsx) — server-rendered; rooms without a `room_briefs` row are omitted; empty state when no briefs exist.
+- **Data:** [`lib/handoff/query.ts`](lib/handoff/query.ts) — `loadHandoffData` batches property, theme, rooms, latest brief per room (max `version`), latest `renders` row per room with `status = 'complete'`, `property_photos`; signs `property-photos`, `renders` (24h TTL), `property-references` (1h). Before-photo pick matches studio (`room.label` / `room_type` on `room_label`, else first photo by `uploaded_at`).
+- **PDF:** Option A — [`components/handoff/handoff-print-button.tsx`](components/handoff/handoff-print-button.tsx) calls `window.print()`; user chooses Save as PDF in the browser dialog.
+- **Print CSS:** [`app/globals.css`](app/globals.css) — scoped with `body:has([data-handoff-page])`: hide app header, 7.5in max content, letter `@page`, page breaks between room sections via `break-before-page` on the page.
+- **Navigation:** Handoff link on [`app/properties/[id]/page.tsx`](app/properties/[id]/page.tsx).
+
+**Notes:**
+
+- **`properties` has no `property_type` column** — header uses **Target buyer** (`buyer_persona`) when set, not a property-type field.
+- **Renders filter** uses DB value `complete` (not `completed`).
+
+**Validation:** `npm run typecheck`, `npm run lint`, `npm run build`.
+
+**Follow-up:** If browser print-to-PDF quality is insufficient, consider Option B (`@react-pdf/renderer`) in a later session.
