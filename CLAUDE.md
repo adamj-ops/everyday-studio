@@ -93,7 +93,7 @@ Phase 1 scope: **Property Setup → Project Theme → Room Brief (moodboard) →
     review-notes.tsx
   /ui/                        # shadcn primitives (Base UI variant)
 
-/supabase/migrations/         # SQL migrations in order (0001 -> 0004)
+/supabase/migrations/         # SQL migrations in order (0001 -> 0005)
 
 /scripts
   /test-prompts.ts            # Sonnet + Opus-prompt-review harness

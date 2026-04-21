@@ -281,3 +281,22 @@ Stop and confirm with the owner if the next agent proposes any of these. All out
 **Validation:** `npm run typecheck`, `npm run lint`, `npm run build`.
 
 **Follow-up:** If browser print-to-PDF quality is insufficient, consider Option B (`@react-pdf/renderer`) in a later session.
+
+---
+
+## Session 10 — Favorites for moodboard references — COMPLETE
+
+**Goal:** Per-user saved references (`saved_references`) so designers star uploads, reuse the same `storage_path` across briefs without duplicate storage, and manage favorites from a minimal `/favorites` page.
+
+**What shipped:**
+
+- **Migration:** [`supabase/migrations/0005_saved_references.sql`](supabase/migrations/0005_saved_references.sql) — table + RLS (`user_id = auth.uid()`), indexes, `unique (user_id, storage_path)`.
+- **API:** [`app/api/favorites/route.ts`](app/api/favorites/route.ts) (GET list with optional `category`, `room_type` — room filter uses `room_type is null OR eq`), POST (validates first path segment is a property the user owns). [`app/api/favorites/[id]/route.ts`](app/api/favorites/[id]/route.ts) PATCH / DELETE. [`app/api/favorites/sign-view/route.ts`](app/api/favorites/sign-view/route.ts) batch-sign paths that appear in the user’s favorites (management UI).
+- **Moodboard signing:** [`app/api/rooms/[id]/moodboard/sign-view/route.ts`](app/api/rooms/[id]/moodboard/sign-view/route.ts) also signs paths listed in `saved_references` for the user so reused favorites preview in another room.
+- **UI:** [`components/favorites/picker.tsx`](components/favorites/picker.tsx); star + save dialog + “Use a favorite” on [`components/brief/moodboard-category-tile.tsx`](components/brief/moodboard-category-tile.tsx) / [`moodboard-grid.tsx`](components/brief/moodboard-grid.tsx); brief loads favorite path set once in [`components/brief/brief-form.tsx`](components/brief/brief-form.tsx). [`app/favorites/page.tsx`](app/favorites/page.tsx) + [`app/favorites/favorites-client.tsx`](app/favorites/favorites-client.tsx). Header [`components/user-menu.tsx`](components/user-menu.tsx) (Dashboard, Favorites, log out).
+- **Taxonomy helpers:** [`lib/briefs/categories.ts`](lib/briefs/categories.ts) — `categoryLabelFromKey`, `ALL_MOODBOARD_CATEGORY_KEYS`. [`lib/favorites/types.ts`](lib/favorites/types.ts), [`lib/favorites/validate-storage-path.ts`](lib/favorites/validate-storage-path.ts).
+
+**Validation:**
+
+- `npm run typecheck`, `npm run lint`, `npm run build` — pass.
+- **Operator:** Run migration; `NOTIFY pgrst, 'reload schema';` if PostgREST misses the table. Smoke-test RLS with two users (B must not see A’s rows). Confirm save → star → GET; picker → image appears; delete favorite → existing brief still shows image after refresh.

@@ -4,11 +4,11 @@ Pick up here. Complements [CLAUDE.md](CLAUDE.md) (rules), [AGENTS.md](AGENTS.md)
 
 ## Current focus
 
-Phase 1 through **Session 9** (GC handoff / print document). Moodboard-driven flow:
+Phase 1 through **Session 10** (favorites for moodboard references). Moodboard-driven flow:
 
 1. Property created → optional theme nudge banner appears.
 2. **Theme** at [`/properties/[id]/theme`](app/properties/[id]/theme/page.tsx) — budget tier + aesthetic preset, one row per property.
-3. **Brief** at [`/properties/[id]/rooms/[roomId]/brief`](app/properties/[id]/rooms/[roomId]/brief/page.tsx) — moodboard uploads per category + creative answers + non-negotiables, versioned.
+3. **Brief** at [`/properties/[id]/rooms/[roomId]/brief`](app/properties/[id]/rooms/[roomId]/brief/page.tsx) — moodboard uploads per category + creative answers + non-negotiables, versioned; **star** saves to [`/favorites`](app/favorites/page.tsx), **Use a favorite** reuses a stored `storage_path`.
 4. **Studio** at [`/properties/[id]/rooms/[roomId]/studio`](app/properties/[id]/rooms/[roomId]/studio/page.tsx) — render, Opus review, conversational edit, **download PNG** (filename uses address slug + room type + render ordinal).
 5. **Handoff** at [`/properties/[id]/handoff`](app/properties/[id]/handoff/page.tsx) — printable contractor / investor summary; **Download PDF** uses the browser print dialog (Save as PDF).
 
@@ -52,7 +52,11 @@ CLI helpers:
 | [`/api/rooms/[id]/brief`](app/api/rooms/[id]/brief/route.ts) | GET latest / PUT new version |
 | [`/api/rooms/[id]/brief/history`](app/api/rooms/[id]/brief/history/route.ts) | GET all versions |
 | [`/api/rooms/[id]/moodboard/upload-sign`](app/api/rooms/[id]/moodboard/upload-sign/route.ts) | Signed PUT for moodboard upload (10/category cap) |
-| [`/api/rooms/[id]/moodboard/sign-view`](app/api/rooms/[id]/moodboard/sign-view/route.ts) | Signed GET for display |
+| [`/api/rooms/[id]/moodboard/sign-view`](app/api/rooms/[id]/moodboard/sign-view/route.ts) | Signed GET for display (current room paths + paths in user `saved_references`) |
+| [`/api/favorites`](app/api/favorites/route.ts) | GET list / POST save favorite |
+| [`/api/favorites/[id]`](app/api/favorites/[id]/route.ts) | PATCH / DELETE favorite row |
+| [`/api/favorites/sign-view`](app/api/favorites/sign-view/route.ts) | POST batch signed URLs for favorite paths |
+| [`/favorites`](app/favorites/page.tsx) | Manage saved references (grid, filters, edit/delete) |
 | [`/api/render/generate`](app/api/render/generate/route.ts) | Full pipeline: load brief → Sonnet → Opus prompt QA → Gemini → Opus image QA |
 | [`/api/render/edit`](app/api/render/edit/route.ts) | Conversational edit against a parent render (Gemini + optional Opus image review) |
 | [`/api/renders/[id]`](app/api/renders/[id]/route.ts) | GET render status + `signed_url` + **`ordinal`** (version index for download filenames) |
@@ -71,6 +75,10 @@ brief + theme + room → loadPromptInput → Sonnet → Opus (prompt QA) → Gem
 - Orchestration: [`lib/render/pipeline.ts`](lib/render/pipeline.ts) (`runGeneratePipeline`, `runEditPipeline`)
 
 Studio UI: [`components/mockup-studio/studio-workspace.tsx`](components/mockup-studio/studio-workspace.tsx), [`render-canvas.tsx`](components/mockup-studio/render-canvas.tsx), [`brief-sidebar.tsx`](components/mockup-studio/brief-sidebar.tsx), [`moodboard-panel.tsx`](components/mockup-studio/moodboard-panel.tsx).
+
+## Data: `saved_references`
+
+Per-user favorites (`user_id` → `auth.users`). `category` stores moodboard **category_key**. `storage_path` points at `property-references`; `unique (user_id, storage_path)`. Deleting a favorite row does not remove storage objects or paths already copied into `room_briefs`.
 
 ## Ops and debugging notes
 
@@ -92,7 +100,7 @@ Studio UI: [`components/mockup-studio/studio-workspace.tsx`](components/mockup-s
 
 ## Plausible next tasks
 
-1. **Sessions 10–11 (parallel):** favorites system, design elevation — follow [`docs/design-spec.md`](docs/design-spec.md). (Session 9 handoff shipped.)
+1. **Session 11:** design elevation — follow [`docs/design-spec.md`](docs/design-spec.md).
 2. Rewrite [`PHASE-2-SCOPE.md`](PHASE-2-SCOPE.md) Stage 1 to reflect `room_briefs` is already the moodboard surface; re-check Stages 4–6 against current schema.
 3. Add a Claude-vision pre-step for before-photo description feeding into Sonnet.
 4. Harden E2E automation: Playwright flow from property creation → theme → brief → render (existing [`scripts/run-render-e2e.ts`](scripts/run-render-e2e.ts) covers pipeline only, not UI).
