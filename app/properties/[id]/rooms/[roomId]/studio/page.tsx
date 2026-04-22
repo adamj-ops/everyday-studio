@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { slugifyAddress, slugifyRoomType } from "@/lib/properties/slug";
 import { signStorageUrls } from "@/lib/supabase/signed-urls";
 import { StudioWorkspace } from "@/components/mockup-studio/studio-workspace";
@@ -96,13 +97,51 @@ export default async function MockupStudioPage({
     const v = versionOrdinal ?? 1;
     let signedUrl: string | null = null;
     if (renderRow.storage_path) {
-      const urls = await signStorageUrls(
-        supabase,
-        "renders",
-        [renderRow.storage_path],
-        RENDER_TTL,
-      ).catch(() => ({}) as Record<string, string>);
-      signedUrl = urls[renderRow.storage_path] ?? null;
+      try {
+        const urls = await signStorageUrls(
+          supabase,
+          "renders",
+          [renderRow.storage_path],
+          RENDER_TTL,
+        );
+        signedUrl = urls[renderRow.storage_path] ?? null;
+        if (!signedUrl) {
+          console.warn(
+            "[studio_sign_render] user-scoped sign returned no url",
+            { path: renderRow.storage_path, renderId: renderRow.id },
+          );
+        }
+      } catch (err) {
+        console.error(
+          "[studio_sign_render] user-scoped sign threw",
+          renderRow.storage_path,
+          err instanceof Error ? err.message : err,
+        );
+      }
+      if (!signedUrl) {
+        try {
+          const admin = createAdminClient();
+          const urls = await signStorageUrls(
+            admin,
+            "renders",
+            [renderRow.storage_path],
+            RENDER_TTL,
+          );
+          signedUrl = urls[renderRow.storage_path] ?? null;
+          if (!signedUrl) {
+            console.error(
+              "[studio_sign_render_admin] admin sign returned no url",
+              { path: renderRow.storage_path, renderId: renderRow.id },
+            );
+          }
+        } catch (err) {
+          console.error(
+            "[studio_sign_render_admin] threw",
+            renderRow.storage_path,
+            err instanceof Error ? err.message : err,
+          );
+        }
+      }
     }
     initialRender = {
       id: renderRow.id,
@@ -132,7 +171,13 @@ export default async function MockupStudioPage({
           "property-references",
           paths,
           REFERENCE_TTL,
-        ).catch(() => ({}) as Record<string, string>)
+        ).catch((err) => {
+          console.error(
+            "[studio_sign_moodboard]",
+            { count: paths.length, err: err instanceof Error ? err.message : err },
+          );
+          return {} as Record<string, string>;
+        })
       : {};
     for (const f of flat) {
       moodboardImages.push({

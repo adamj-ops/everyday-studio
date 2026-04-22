@@ -5,7 +5,7 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { createClient } from "@/lib/supabase/server";
-import { signOut } from "@/app/actions/auth";
+import { UserMenu } from "@/components/user-menu";
 
 export const metadata: Metadata = {
   title: "Everyday Studio",
@@ -31,19 +31,7 @@ export default async function RootLayout({
             >
               Everyday Studio
             </Link>
-            {user ? (
-              <div className="flex items-center gap-4 text-sm">
-                <span className="text-muted-foreground">{user.email}</span>
-                <form action={signOut}>
-                  <button
-                    type="submit"
-                    className="text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
-                  >
-                    Log out
-                  </button>
-                </form>
-              </div>
-            ) : null}
+            {user?.email ? <UserMenu email={user.email} /> : null}
           </div>
         </header>
         <main className="mx-auto max-w-7xl px-6 py-10">{children}</main>

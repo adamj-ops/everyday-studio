@@ -35,6 +35,16 @@ const IN_FLIGHT_STATES = new Set([
   "image_review",
 ]);
 
+/** Terminal-ish success states where we expect a signed image URL. */
+function isCompleteWithoutPreview(render: NonNullable<RenderCanvasProps["initialRender"]>) {
+  return (
+    !render.signedUrl &&
+    !IN_FLIGHT_STATES.has(render.status) &&
+    render.status !== "failed" &&
+    render.status !== "gated_by_opus"
+  );
+}
+
 export function RenderCanvas({
   roomId: _roomId,
   initialRender,
@@ -60,6 +70,7 @@ export function RenderCanvas({
   const canEdit =
     Boolean(render?.signedUrl) && !inFlight && render?.status !== "failed";
   const canDownload = Boolean(render?.signedUrl) && !downloading;
+  const showImageUnavailable = Boolean(render && isCompleteWithoutPreview(render));
 
   const onDownload = () => {
     if (!render?.signedUrl) return;
@@ -131,6 +142,8 @@ export function RenderCanvas({
           />
         ) : inFlight ? (
           <PipelineSkeleton status={render?.status ?? "pending"} />
+        ) : showImageUnavailable ? (
+          <UnavailableState onRefresh={onRefresh} />
         ) : (
           <EmptyState
             render={render}
@@ -188,9 +201,15 @@ export function RenderCanvas({
             ? "Change one thing at a time. The edit preserves everything else in the image."
             : render?.status === "failed"
               ? "Regenerate first, then you can apply targeted edits."
-              : render
-                ? "Generating… edits unlock when the render completes."
-                : "Generate a mockup first to unlock edits."}
+              : render?.status === "gated_by_opus"
+                ? "Fix the prompt issues on the right, then regenerate before editing."
+                : showImageUnavailable
+                  ? "Render completed but the preview didn’t load — use Retry above, then you can edit."
+                  : render && IN_FLIGHT_STATES.has(render.status)
+                    ? "Generating… edits unlock when the render completes."
+                    : render
+                      ? "Edits need a loaded preview."
+                      : "Generate a mockup first to unlock edits."}
         </p>
         <div className="mt-2 flex flex-col gap-2">
           <Textarea
@@ -201,7 +220,9 @@ export function RenderCanvas({
             placeholder={
               canEdit
                 ? "e.g. Remove the second refrigerator — there should be only one panel-ready fridge clad in cabinet panels."
-                : "Waiting on a completed render…"
+                : showImageUnavailable
+                  ? "Retry loading the preview above…"
+                  : "Waiting on a completed render…"
             }
             rows={2}
           />
@@ -296,6 +317,25 @@ function stageLabel(status: string): string {
     default:
       return "Working…";
   }
+}
+
+function UnavailableState({
+  onRefresh,
+}: {
+  onRefresh: () => void | Promise<void>;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-3 px-6 py-10 text-center text-sm text-muted-foreground">
+      <p className="font-medium text-foreground">Preview unavailable</p>
+      <p className="max-w-xs text-pretty text-xs">
+        Render completed but the image could not be loaded. This is usually a
+        transient signing issue — retry fetches a fresh signed URL.
+      </p>
+      <Button size="sm" variant="outline" onClick={() => void onRefresh()}>
+        <RefreshCcw className="mr-1 size-3" /> Retry
+      </Button>
+    </div>
+  );
 }
 
 function EmptyState({

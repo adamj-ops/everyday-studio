@@ -84,3 +84,16 @@ export function categoriesForRoom(roomType: string): Category[] {
   }
   return OTHER_CATEGORIES;
 }
+
+/** Resolve moodboard category label from persisted category_key. */
+export function categoryLabelFromKey(key: string): string {
+  for (const cats of Object.values(CATEGORIES_BY_ROOM)) {
+    const c = cats.find((x) => x.key === key);
+    if (c) return c.label;
+  }
+  return key;
+}
+
+export const ALL_MOODBOARD_CATEGORY_KEYS: string[] = Array.from(
+  new Set(Object.values(CATEGORIES_BY_ROOM).flatMap((cats) => cats.map((c) => c.key))),
+).sort((a, b) => a.localeCompare(b));

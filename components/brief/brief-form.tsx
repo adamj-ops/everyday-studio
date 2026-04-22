@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useReducer, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState, useTransition } from "react";
 import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -71,6 +71,7 @@ function briefToState(
         image_storage_paths: [...cm.image_storage_paths],
         signed_urls: signed,
         notes: cm.notes ?? "",
+        upload_filenames: {},
       };
     }
   }
@@ -113,6 +114,28 @@ export function BriefForm({
   );
 
   const [isSaving, startSaving] = useTransition();
+  const [favoriteStoragePaths, setFavoriteStoragePaths] = useState<Set<string>>(() => new Set());
+
+  const refreshFavorites = useCallback(async () => {
+    try {
+      const res = await fetch("/api/favorites");
+      if (!res.ok) return;
+      const body = (await res.json()) as { favorites?: { storage_path: string }[] };
+      setFavoriteStoragePaths(
+        new Set((body.favorites ?? []).map((f) => f.storage_path).filter(Boolean)),
+      );
+    } catch {
+      // non-fatal
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshFavorites();
+  }, [refreshFavorites]);
+
+  const onFavoritePathSaved = useCallback((storagePath: string) => {
+    setFavoriteStoragePaths((prev) => new Set([...prev, storagePath]));
+  }, []);
 
   const hasSaved = state.lastSavedVersion !== null && !state.dirty;
 
@@ -289,8 +312,11 @@ export function BriefForm({
         <MoodboardGrid
           categories={categories}
           roomId={roomId}
+          roomType={roomType}
           state={state.tiles}
           onChangeCategory={(key, value) => dispatch({ type: "set_tile", key, value })}
+          favoriteStoragePaths={favoriteStoragePaths}
+          onFavoritePathSaved={onFavoritePathSaved}
         />
       </section>
 

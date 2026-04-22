@@ -6,13 +6,19 @@ import { MoodboardCategoryTile, type MoodboardTileState } from "./moodboard-cate
 export function MoodboardGrid({
   categories,
   roomId,
+  roomType,
   state,
   onChangeCategory,
+  favoriteStoragePaths,
+  onFavoritePathSaved,
 }: {
   categories: Category[];
   roomId: string;
+  roomType: string;
   state: Record<string, MoodboardTileState>;
   onChangeCategory: (categoryKey: string, next: MoodboardTileState) => void;
+  favoriteStoragePaths: ReadonlySet<string>;
+  onFavoritePathSaved: (storagePath: string) => void;
 }) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -28,8 +34,11 @@ export function MoodboardGrid({
             key={cat.key}
             category={cat}
             roomId={roomId}
+            roomType={roomType}
             state={tileState}
             onChange={(next) => onChangeCategory(cat.key, next)}
+            favoriteStoragePaths={favoriteStoragePaths}
+            onFavoritePathSaved={onFavoritePathSaved}
           />
         );
       })}

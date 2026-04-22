@@ -42,7 +42,24 @@ export async function POST(
   if (!room) return NextResponse.json({ error: "room_not_found" }, { status: 404 });
 
   const prefix = `${room.property_id}/${roomId}/`;
-  const safePaths = parsed.data.paths.filter((p) => p.startsWith(prefix));
+  const localPaths = parsed.data.paths.filter((p) => p.startsWith(prefix));
+  const foreignPaths = [...new Set(parsed.data.paths.filter((p) => !p.startsWith(prefix)))];
+
+  let favoritePaths: string[] = [];
+  if (foreignPaths.length > 0) {
+    const { data: favRows, error: favErr } = await supabase
+      .from("saved_references")
+      .select("storage_path")
+      .in("storage_path", foreignPaths);
+    if (favErr) {
+      return internalError("moodboard_sign_view_favorites", favErr);
+    }
+    favoritePaths = (favRows ?? [])
+      .map((r) => r.storage_path)
+      .filter((p): p is string => typeof p === "string");
+  }
+
+  const safePaths = [...new Set([...localPaths, ...favoritePaths])];
   if (safePaths.length === 0) return NextResponse.json({ urls: {} });
 
   try {

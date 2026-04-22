@@ -21,7 +21,19 @@ export async function signStorageUrls(
   if (error) throw error;
   const map: Record<string, string> = {};
   for (const entry of data ?? []) {
-    if (entry.path && entry.signedUrl) map[entry.path] = entry.signedUrl;
+    if (entry.path && entry.signedUrl) {
+      map[entry.path] = entry.signedUrl;
+    } else if (entry.error) {
+      // Per-entry errors (RLS denial, missing object) are otherwise
+      // swallowed silently — log once so callers can spot them.
+      console.warn(
+        `[signStorageUrls] ${bucket} entry failed for ${entry.path ?? "?"}: ${entry.error}`,
+      );
+    } else if (entry.path) {
+      console.warn(
+        `[signStorageUrls] ${bucket} no signedUrl for ${entry.path} (no per-entry error)`,
+      );
+    }
   }
   return map;
 }

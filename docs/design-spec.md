@@ -4,7 +4,13 @@ Contract for parallel design-elevation work. Align new UI with these tokens and 
 
 ## Inspiration benchmarks
 
-TODO: User to specify 2–3 reference apps for visual anchor (e.g. Stripe, Linear, Raycast).
+Visual anchors for elevation work—prefer these products’ *patterns*, not pixel-perfect clones:
+
+1. **Stripe Dashboard** — Restrained professional polish: neutral-first surfaces, one confident accent, label/value hierarchy, table density with clear column rhythm, status badges that read at a glance.
+2. **Linear** — Density done right: tight but breathable layouts, strong typographic hierarchy without shouting, keyboard-first affordances where applicable, disciplined light/dark theming (no ad-hoc grays per screen).
+3. **Vercel Dashboard** — Modern SaaS baseline: calm defaults, subtle elevation, purposeful whitespace, components that feel “product” not “template.”
+
+**Session 11 rule:** When a screen choice is ambiguous, default toward **Stripe’s hierarchy + Linear’s density discipline + Vercel’s quiet modernism**—in that order of tie-break (clarity → information layout → overall vibe).
 
 ## Design tokens
 

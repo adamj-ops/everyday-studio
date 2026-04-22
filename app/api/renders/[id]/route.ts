@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { internalError } from "@/lib/api/internal-error";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { signStorageUrls } from "@/lib/supabase/signed-urls";
 
 export const runtime = "nodejs";
@@ -47,13 +48,51 @@ export async function GET(
 
   let signedUrl: string | null = null;
   if (render.storage_path) {
-    const urls = await signStorageUrls(
-      supabase,
-      "renders",
-      [render.storage_path],
-      RENDER_TTL,
-    ).catch(() => ({}) as Record<string, string>);
-    signedUrl = urls[render.storage_path] ?? null;
+    // User-scoped RLS already passed (we found the row above), so if the
+    // Storage RLS check disagrees for this path we still want the URL —
+    // fall through to the admin client. Logging the first error helps
+    // surface bucket-policy drift.
+    try {
+      const urls = await signStorageUrls(
+        supabase,
+        "renders",
+        [render.storage_path],
+        RENDER_TTL,
+      );
+      signedUrl = urls[render.storage_path] ?? null;
+      if (!signedUrl) {
+        console.warn(
+          `[render_sign] user-scoped sign returned no url for ${render.storage_path} (render ${render.id}) — falling back to admin`,
+        );
+      }
+    } catch (err) {
+      console.warn(
+        `[render_sign] user-scoped sign threw for ${render.storage_path} (render ${render.id}):`,
+        err instanceof Error ? err.message : err,
+      );
+    }
+    if (!signedUrl) {
+      try {
+        const admin = createAdminClient();
+        const urls = await signStorageUrls(
+          admin,
+          "renders",
+          [render.storage_path],
+          RENDER_TTL,
+        );
+        signedUrl = urls[render.storage_path] ?? null;
+        if (!signedUrl) {
+          console.error(
+            `[render_sign] admin sign also returned no url for ${render.storage_path} (render ${render.id})`,
+          );
+        }
+      } catch (err) {
+        console.error(
+          `[render_sign] admin sign threw for ${render.storage_path} (render ${render.id}):`,
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
   }
 
   return NextResponse.json({

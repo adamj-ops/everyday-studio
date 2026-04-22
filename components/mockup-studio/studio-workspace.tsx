@@ -150,6 +150,14 @@ export function StudioWorkspace({
         } catch (err) {
           if (ctrl.signal.aborted) return;
           console.warn("[studio] poll error, retrying once", err);
+          if (
+            pollStartedAtRef.current &&
+            Date.now() - pollStartedAtRef.current > POLL_TIMEOUT_MS
+          ) {
+            setPollingTimedOut(true);
+            stopPolling();
+            return;
+          }
           setTimeout(tick, POLL_INTERVAL_MS * 2);
         }
       };
@@ -163,6 +171,24 @@ export function StudioWorkspace({
 
   useEffect(() => {
     if (!initialRender) return;
+    if (
+      TERMINAL_STATES.has(initialRender.status) &&
+      !initialRender.signed_url
+    ) {
+      // SSR may fail to sign (stale JWT / RLS drift). GET /api/renders/[id]
+      // retries with admin fallback — one fetch heals the canvas.
+      void (async () => {
+        try {
+          const body = await fetchRenderOnce(initialRender.id);
+          setRender(applyRenderBody(body));
+          setPollingTimedOut(false);
+          if (!TERMINAL_STATES.has(body.status)) startPolling(initialRender.id);
+        } catch (err) {
+          console.warn("[studio] initial heal fetch failed", err);
+        }
+      })();
+      return;
+    }
     if (TERMINAL_STATES.has(initialRender.status)) return;
     startPolling(initialRender.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
