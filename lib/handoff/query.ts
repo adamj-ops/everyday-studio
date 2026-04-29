@@ -1,15 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  RoomBriefSchema,
+  SpaceBriefSchema,
   type ProjectThemeRow,
-  type RoomBrief,
+  type SpaceBrief,
 } from "@/lib/briefs/schema";
 import {
   THEME_PRESETS,
   budgetTierLabel,
   themePresetLabel,
 } from "@/lib/briefs/themes";
-import { roomTypeLabel } from "@/lib/briefs/room-types";
+import { spaceTypeLabel } from "@/lib/briefs/space-types";
 import { signStorageUrls } from "@/lib/supabase/signed-urls";
 
 const RENDER_TTL_SECONDS = 24 * 60 * 60;
@@ -29,7 +29,7 @@ export type HandoffProperty = {
 export type HandoffRoom = {
   id: string;
   property_id: string;
-  room_type: string;
+  space_type: string;
   label: string;
 };
 
@@ -42,7 +42,7 @@ export type HandoffPropertyPhoto = {
 
 export type HandoffRender = {
   id: string;
-  room_id: string;
+  space_id: string;
   status: string;
   storage_path: string | null;
   created_at: string;
@@ -56,7 +56,7 @@ export type MoodboardReference = {
 
 export type HandoffRoomBlock = {
   room: HandoffRoom;
-  brief: RoomBrief;
+  brief: SpaceBrief;
   briefVersion: number;
   latestRender: (HandoffRender & { signedUrl: string | null }) | null;
   beforePhoto: (HandoffPropertyPhoto & { signedUrl: string | null }) | null;
@@ -66,7 +66,7 @@ export type HandoffRoomBlock = {
 export type HandoffData = {
   property: HandoffProperty;
   theme: ProjectThemeRow | null;
-  rooms: HandoffRoomBlock[];
+  spaces: HandoffRoomBlock[];
 };
 
 function pickBeforePhoto(
@@ -78,7 +78,7 @@ function pickBeforePhoto(
   return (
     photos.find((p) => (p.room_label ?? "").toLowerCase() === roomLabelLc) ??
     photos.find((p) =>
-      (p.room_label ?? "").toLowerCase().includes(room.room_type.toLowerCase()),
+      (p.room_label ?? "").toLowerCase().includes(room.space_type.toLowerCase()),
     ) ??
     photos[0] ??
     null
@@ -95,7 +95,7 @@ function themePresetDescription(preset: string | null | undefined): string | nul
  * Narrative for the handoff "design direction" section.
  */
 export function buildDesignDirectionSummary(data: HandoffData): string {
-  const { theme, rooms } = data;
+  const { theme, spaces } = data;
   const tierLabel = theme ? budgetTierLabel(theme.budget_tier) : "unspecified tier";
   const presetLabel =
     theme?.theme_preset != null ? themePresetLabel(theme.theme_preset) : "custom direction";
@@ -105,7 +105,7 @@ export function buildDesignDirectionSummary(data: HandoffData): string {
       : themePresetDescription(theme?.theme_preset ?? null) ?? "";
 
   const nonNegotLines: string[] = [];
-  for (const block of rooms) {
+  for (const block of spaces) {
     const t = (block.brief.non_negotiables ?? "").trim();
     if (t) nonNegotLines.push(t);
   }
@@ -121,22 +121,22 @@ export function buildDesignDirectionSummary(data: HandoffData): string {
     return `This project follows a ${presetLabel} direction at the ${tierLabel} investment level. ${presetDesc}${nonNegotSnippet}`.trim();
   }
 
-  const roomList = rooms.map((r) => r.room.label || roomTypeLabel(r.room.room_type)).join(", ");
-  return `Property styled in ${presetLabel} aesthetic at ${tierLabel} tier.${roomList ? ` Rooms in scope: ${roomList}.` : ""}`.trim();
+  const roomList = spaces.map((r) => r.room.label || spaceTypeLabel(r.room.space_type)).join(", ");
+  return `Property styled in ${presetLabel} aesthetic at ${tierLabel} tier.${roomList ? ` Spaces in scope: ${roomList}.` : ""}`.trim();
 }
 
 export async function loadHandoffData(
   supabase: SupabaseClient,
   propertyId: string,
 ): Promise<HandoffData | null> {
-  const [propertyResult, themeResult, roomsResult] = await Promise.all([
+  const [propertyResult, themeResult, spacesResult] = await Promise.all([
     supabase.from("properties").select("*").eq("id", propertyId).maybeSingle(),
     supabase.from("project_themes").select("*").eq("property_id", propertyId).maybeSingle(),
     supabase
-      .from("rooms")
-      .select("id, property_id, room_type, label")
+      .from("spaces")
+      .select("id, property_id, space_type, label")
       .eq("property_id", propertyId)
-      .order("room_type")
+      .order("space_type")
       .order("label"),
   ]);
 
@@ -154,24 +154,24 @@ export async function loadHandoffData(
   };
 
   const theme = (themeResult.data as ProjectThemeRow | null) ?? null;
-  const rooms = (roomsResult.data ?? []) as HandoffRoom[];
-  const roomIds = rooms.map((r) => r.id);
+  const spaces = (spacesResult.data ?? []) as HandoffRoom[];
+  const spaceIds = spaces.map((r) => r.id);
 
-  if (roomIds.length === 0) {
-    return { property, theme, rooms: [] };
+  if (spaceIds.length === 0) {
+    return { property, theme, spaces: [] };
   }
 
   const [briefsResult, rendersResult, photosResult] = await Promise.all([
     supabase
-      .from("room_briefs")
+      .from("space_briefs")
       .select(
-        "id, room_id, version, creative_answers, non_negotiables, category_moodboards",
+        "id, space_id, version, surface_type, creative_answers, non_negotiables, category_moodboards",
       )
-      .in("room_id", roomIds),
+      .in("space_id", spaceIds),
     supabase
       .from("renders")
-      .select("id, room_id, status, storage_path, created_at")
-      .in("room_id", roomIds)
+      .select("id, space_id, status, storage_path, created_at")
+      .in("space_id", spaceIds)
       .eq("status", "complete")
       .order("created_at", { ascending: false }),
     supabase
@@ -183,7 +183,7 @@ export async function loadHandoffData(
 
   const briefRows = (briefsResult.data ?? []) as Array<{
     id: string;
-    room_id: string;
+    space_id: string;
     version: number;
     creative_answers: unknown;
     non_negotiables: unknown;
@@ -192,14 +192,14 @@ export async function loadHandoffData(
 
   const latestBriefByRoom = new Map<string, (typeof briefRows)[0]>();
   for (const br of briefRows) {
-    const cur = latestBriefByRoom.get(br.room_id);
-    if (!cur || br.version > cur.version) latestBriefByRoom.set(br.room_id, br);
+    const cur = latestBriefByRoom.get(br.space_id);
+    if (!cur || br.version > cur.version) latestBriefByRoom.set(br.space_id, br);
   }
 
   const renderRows = (rendersResult.data ?? []) as HandoffRender[];
   const latestRenderByRoom = new Map<string, HandoffRender>();
   for (const rr of renderRows) {
-    if (!latestRenderByRoom.has(rr.room_id)) latestRenderByRoom.set(rr.room_id, rr);
+    if (!latestRenderByRoom.has(rr.space_id)) latestRenderByRoom.set(rr.space_id, rr);
   }
 
   const photos = (photosResult.data ?? []) as HandoffPropertyPhoto[];
@@ -210,11 +210,11 @@ export async function loadHandoffData(
 
   const blocks: HandoffRoomBlock[] = [];
 
-  for (const room of rooms) {
+  for (const room of spaces) {
     const briefRow = latestBriefByRoom.get(room.id);
     if (!briefRow) continue;
 
-    const parsed = RoomBriefSchema.safeParse({
+    const parsed = SpaceBriefSchema.safeParse({
       creative_answers: briefRow.creative_answers ?? {},
       non_negotiables: briefRow.non_negotiables ?? null,
       category_moodboards: Array.isArray(briefRow.category_moodboards)
@@ -293,5 +293,5 @@ export async function loadHandoffData(
     }));
   }
 
-  return { property, theme, rooms: blocks };
+  return { property, theme, spaces: blocks };
 }

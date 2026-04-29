@@ -1,4 +1,4 @@
-import type { RoomType } from "./room-types";
+import type { SpaceType } from "./space-types";
 
 export interface CreativeQuestion {
   key: string;
@@ -129,7 +129,15 @@ const OTHER_QUESTIONS: CreativeQuestion[] = [
   { key: "references", prompt: "Any references?", placeholder: "" },
 ];
 
-export const QUESTIONS_BY_ROOM: Record<RoomType, CreativeQuestion[]> = {
+const EXTERIOR_SURFACE_QUESTIONS: CreativeQuestion[] = [
+  { key: "creative_direction", prompt: "Describe the overall direction for this exterior surface.", placeholder: "" },
+  { key: "hero_moment", prompt: "What should be the hero moment?", placeholder: "" },
+  { key: "materials_excitement", prompt: "What materials, plantings, or finishes are most important?", placeholder: "" },
+  { key: "avoid", prompt: "What should this exterior NOT feel like?", placeholder: "" },
+  { key: "references", prompt: "Any designers, landscapes, projects, or references?", placeholder: "" },
+];
+
+export const QUESTIONS_BY_SPACE: Record<SpaceType, CreativeQuestion[]> = {
   kitchen: [
     {
       key: "vibe",
@@ -172,7 +180,7 @@ export const QUESTIONS_BY_ROOM: Record<RoomType, CreativeQuestion[]> = {
   powder: [
     {
       key: "vibe",
-      prompt: "Powder rooms are the best place to have fun. What vibe?",
+      prompt: "Powder spaces are the best place to have fun. What vibe?",
       placeholder: "e.g., dark and moody, a jewel box, a bold wallpaper moment...",
     },
     { key: "hero_moment", prompt: "What should be the hero moment?", placeholder: "" },
@@ -193,11 +201,15 @@ export const QUESTIONS_BY_ROOM: Record<RoomType, CreativeQuestion[]> = {
   hallway: OTHER_QUESTIONS,
   laundry: OTHER_QUESTIONS,
   office: OTHER_QUESTIONS,
+  facade: EXTERIOR_SURFACE_QUESTIONS,
+  hardscape: EXTERIOR_SURFACE_QUESTIONS,
+  landscape: EXTERIOR_SURFACE_QUESTIONS,
+  garden: EXTERIOR_SURFACE_QUESTIONS,
 };
 
-export function questionsForRoom(roomType: string): CreativeQuestion[] {
-  if (roomType in QUESTIONS_BY_ROOM) {
-    return QUESTIONS_BY_ROOM[roomType as RoomType];
+export function questionsForSpace(spaceType: string): CreativeQuestion[] {
+  if (spaceType in QUESTIONS_BY_SPACE) {
+    return QUESTIONS_BY_SPACE[spaceType as SpaceType];
   }
   return OTHER_QUESTIONS;
 }

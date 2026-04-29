@@ -4,7 +4,7 @@ export interface SavedReferenceRow {
   storage_path: string;
   original_filename: string | null;
   category: string;
-  room_type: string | null;
+  space_type: string | null;
   label: string | null;
   notes: string | null;
   created_at: string;

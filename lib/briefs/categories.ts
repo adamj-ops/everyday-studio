@@ -1,4 +1,4 @@
-import type { RoomType } from "./room-types";
+import type { SpaceType } from "./space-types";
 
 export interface Category {
   key: string;
@@ -49,7 +49,15 @@ const OTHER_CATEGORIES: Category[] = [
   { key: "details", label: "Details & Accents", description: "Everything else" },
 ];
 
-export const CATEGORIES_BY_ROOM: Record<RoomType, Category[]> = {
+const EXTERIOR_SURFACE_CATEGORIES: Category[] = [
+  { key: "palette", label: "Palette", description: "Overall color direction" },
+  { key: "materials", label: "Materials", description: "Primary hard materials and finishes" },
+  { key: "planting", label: "Planting", description: "Planting or landscape relationship" },
+  { key: "lighting", label: "Lighting", description: "Exterior lighting and evening read" },
+  { key: "details", label: "Details", description: "Edges, hardware, accessories, and finishing details" },
+];
+
+export const CATEGORIES_BY_SPACE: Record<SpaceType, Category[]> = {
   kitchen: [
     { key: "appliances", label: "Appliances", description: "Range, fridge, dishwasher, hood" },
     { key: "cabinetry", label: "Cabinetry", description: "Cabinet style, finish, hardware" },
@@ -76,18 +84,22 @@ export const CATEGORIES_BY_ROOM: Record<RoomType, Category[]> = {
   hallway: OTHER_CATEGORIES,
   laundry: OTHER_CATEGORIES,
   office: OTHER_CATEGORIES,
+  facade: EXTERIOR_SURFACE_CATEGORIES,
+  hardscape: EXTERIOR_SURFACE_CATEGORIES,
+  landscape: EXTERIOR_SURFACE_CATEGORIES,
+  garden: EXTERIOR_SURFACE_CATEGORIES,
 };
 
-export function categoriesForRoom(roomType: string): Category[] {
-  if (roomType in CATEGORIES_BY_ROOM) {
-    return CATEGORIES_BY_ROOM[roomType as RoomType];
+export function categoriesForSpace(spaceType: string): Category[] {
+  if (spaceType in CATEGORIES_BY_SPACE) {
+    return CATEGORIES_BY_SPACE[spaceType as SpaceType];
   }
   return OTHER_CATEGORIES;
 }
 
 /** Resolve moodboard category label from persisted category_key. */
 export function categoryLabelFromKey(key: string): string {
-  for (const cats of Object.values(CATEGORIES_BY_ROOM)) {
+  for (const cats of Object.values(CATEGORIES_BY_SPACE)) {
     const c = cats.find((x) => x.key === key);
     if (c) return c.label;
   }
@@ -95,5 +107,5 @@ export function categoryLabelFromKey(key: string): string {
 }
 
 export const ALL_MOODBOARD_CATEGORY_KEYS: string[] = Array.from(
-  new Set(Object.values(CATEGORIES_BY_ROOM).flatMap((cats) => cats.map((c) => c.key))),
+  new Set(Object.values(CATEGORIES_BY_SPACE).flatMap((cats) => cats.map((c) => c.key))),
 ).sort((a, b) => a.localeCompare(b));
