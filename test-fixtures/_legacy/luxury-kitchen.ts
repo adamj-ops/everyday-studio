@@ -24,7 +24,7 @@ export const luxuryKitchenContext: PropertyContext = {
 };
 
 export const luxuryKitchenSpec: RoomSpec = {
-  room_type: "kitchen",
+  space_type: "kitchen",
   room_name: "Primary Kitchen",
   dimensions: "16x20",
   ceiling_height: "10 ft",
