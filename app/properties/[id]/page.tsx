@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { buyerPersonaLabel, formatUsd } from "@/lib/properties/property";
-import { roomTypeLabel } from "@/lib/briefs/room-types";
+import { spaceTypeLabel } from "@/lib/briefs/space-types";
 import { signPhotoUrls } from "@/lib/supabase/signed-urls";
 import { budgetTierLabel, themePresetLabel } from "@/lib/briefs/themes";
 import { PhotoGrid } from "@/components/photo-grid";
@@ -23,7 +23,7 @@ export default async function PropertyPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const [propertyResult, photosResult, roomsResult, themeResult, briefResult] =
+  const [propertyResult, photosResult, spacesResult, themeResult, briefResult] =
     await Promise.all([
       supabase.from("properties").select("*").eq("id", id).maybeSingle(),
       supabase
@@ -32,18 +32,18 @@ export default async function PropertyPage({
         .eq("property_id", id)
         .order("uploaded_at", { ascending: false }),
       supabase
-        .from("rooms")
-        .select("id, room_type, label")
+        .from("spaces")
+        .select("id, space_type, label")
         .eq("property_id", id)
-        .order("room_type"),
+        .order("space_type"),
       supabase
         .from("project_themes")
         .select("id, budget_tier, theme_preset")
         .eq("property_id", id)
         .maybeSingle(),
       supabase
-        .from("room_briefs")
-        .select("room_id, version")
+        .from("space_briefs")
+        .select("space_id, version")
         .order("version", { ascending: false }),
     ]);
 
@@ -53,14 +53,14 @@ export default async function PropertyPage({
 
   const property = propertyResult.data;
   const photos = photosResult.data ?? [];
-  const rooms = roomsResult.data ?? [];
+  const spaces = spacesResult.data ?? [];
   const theme = themeResult.data;
 
-  // Map room_id -> latest brief version (first row per room thanks to the DESC sort).
+  // Map space_id -> latest brief version (first row per room thanks to the DESC sort).
   const latestBriefByRoom = new Map<string, number>();
-  for (const row of (briefResult.data ?? []) as Array<{ room_id: string; version: number }>) {
-    if (!latestBriefByRoom.has(row.room_id)) {
-      latestBriefByRoom.set(row.room_id, row.version);
+  for (const row of (briefResult.data ?? []) as Array<{ space_id: string; version: number }>) {
+    if (!latestBriefByRoom.has(row.space_id)) {
+      latestBriefByRoom.set(row.space_id, row.version);
     }
   }
 
@@ -109,8 +109,8 @@ export default async function PropertyPage({
               <dd>{photos.length}</dd>
             </div>
             <div>
-              <dt className="text-xs text-muted-foreground">Rooms</dt>
-              <dd>{rooms.length}</dd>
+              <dt className="text-xs text-muted-foreground">Spaces</dt>
+              <dd>{spaces.length}</dd>
             </div>
             {theme && (
               <div>
@@ -158,29 +158,29 @@ export default async function PropertyPage({
             Some photos couldn&apos;t be loaded — refresh the page to retry.
           </p>
         ) : null}
-        <PhotoGrid photos={photos} rooms={rooms} signedUrls={signedUrls} />
+        <PhotoGrid photos={photos} spaces={spaces} signedUrls={signedUrls} />
       </section>
 
       <section>
-        <h2 className="mb-4 text-lg font-medium">Rooms</h2>
-        {rooms.length === 0 ? (
+        <h2 className="mb-4 text-lg font-medium">Spaces</h2>
+        {spaces.length === 0 ? (
           <div className="rounded-xl border border-dashed px-6 py-8 text-center text-sm text-muted-foreground">
-            No rooms yet — add photos to create rooms.
+            No spaces yet — add photos to create spaces.
           </div>
         ) : (
           <ul className="divide-y rounded-xl border">
-            {rooms.map((room) => {
+            {spaces.map((room) => {
               const briefVersion = latestBriefByRoom.get(room.id) ?? null;
               return (
                 <li key={room.id} className="flex items-center justify-between px-4 py-3 text-sm">
                   <Link
-                    href={`/properties/${id}/rooms/${room.id}/brief`}
+                    href={`/properties/${id}/spaces/${room.id}/brief`}
                     className="flex flex-1 items-center justify-between gap-4"
                   >
                     <div>
                       <p className="font-medium">{room.label}</p>
                       <p className="text-xs text-muted-foreground">
-                        {roomTypeLabel(room.room_type)}
+                        {spaceTypeLabel(room.space_type)}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">

@@ -6,7 +6,7 @@
  * without any session cookie or HTTP round-trip.
  *
  * Usage:
- *   tsx scripts/run-render-e2e.ts <room_id> <base_photo_id>
+ *   tsx scripts/run-render-e2e.ts <space_id> <base_photo_id>
  *
  * Outputs a narrative of each pipeline stage + the final artifacts
  * (render storage path, Opus prompt-review verdict, Opus image-review
@@ -56,9 +56,9 @@ function divider(title: string): void {
 async function main(): Promise<void> {
   loadEnv();
 
-  const [roomId, basePhotoId] = process.argv.slice(2);
-  if (!roomId || !basePhotoId) {
-    console.error("Usage: tsx scripts/run-render-e2e.ts <room_id> <base_photo_id>");
+  const [spaceId, basePhotoId] = process.argv.slice(2);
+  if (!spaceId || !basePhotoId) {
+    console.error("Usage: tsx scripts/run-render-e2e.ts <space_id> <base_photo_id>");
     process.exit(1);
   }
 
@@ -87,7 +87,7 @@ async function main(): Promise<void> {
 
   const loaded = await loadPromptInput({
     supabase: admin,
-    roomId,
+    spaceId,
     basePhotoDescription: `Before-state photo of the room (storage: ${photo.storage_path}). Designer has not provided a written description — infer the before state from the photo itself.`,
   });
   if (!loaded.ok) {
@@ -95,7 +95,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   console.log("  property:", loaded.input.property.address);
-  console.log("  room:", loaded.input.room.room_type, "-", loaded.input.room.label);
+  console.log("  space:", loaded.input.space.space_type, "-", loaded.input.space.label);
   console.log(
     "  theme:",
     loaded.input.project_theme
@@ -104,14 +104,14 @@ async function main(): Promise<void> {
   );
   console.log(
     "  creative_answers:",
-    Object.keys(loaded.input.room_brief.creative_answers).length,
+    Object.keys(loaded.input.space_brief.creative_answers).length,
     "filled",
   );
   console.log(
     "  non_negotiables:",
-    loaded.input.room_brief.non_negotiables ? "yes" : "none",
+    loaded.input.space_brief.non_negotiables ? "yes" : "none",
   );
-  console.log("  moodboard categories:", loaded.input.room_brief.category_moodboards.length);
+  console.log("  moodboard categories:", loaded.input.space_brief.category_moodboards.length);
   console.log("  reference images attached:", loaded.input.reference_images.length);
 
   divider("DOWNLOAD base photo + moodboard images");
@@ -141,7 +141,7 @@ async function main(): Promise<void> {
   const { data: renderRow, error: insertErr } = await admin
     .from("renders")
     .insert({
-      room_id: roomId,
+      space_id: spaceId,
       base_photo_id: basePhotoId,
       room_spec_id: null,
       prompt_text: "",

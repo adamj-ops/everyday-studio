@@ -16,7 +16,7 @@ import type { RoomSpec } from "../lib/specs/schema";
 export { vincentAveContext } from "./vincent-ave-kitchen";
 
 export const vincentAvePrimaryBathSpec: RoomSpec = {
-  room_type: "primary_bath",
+  space_type: "primary_bath",
   room_name: "Primary Bath",
   dimensions: "8x10",
   ceiling_height: "8.5 ft",

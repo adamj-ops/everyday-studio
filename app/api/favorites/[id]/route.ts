@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { internalError } from "@/lib/api/internal-error";
 import { createClient } from "@/lib/supabase/server";
-import { RoomTypeEnum } from "@/lib/briefs/room-types";
+import { SpaceTypeEnum } from "@/lib/briefs/space-types";
 
 const IdSchema = z.string().uuid();
 
@@ -11,14 +11,14 @@ const PatchBodySchema = z
     label: z.string().max(500).nullable().optional(),
     notes: z.string().max(2000).nullable().optional(),
     category: z.string().min(1).max(80).optional(),
-    room_type: z.union([RoomTypeEnum, z.null()]).optional(),
+    space_type: z.union([SpaceTypeEnum, z.null()]).optional(),
   })
   .refine(
     (o) =>
       o.label !== undefined ||
       o.notes !== undefined ||
       o.category !== undefined ||
-      o.room_type !== undefined,
+      o.space_type !== undefined,
     { message: "at least one field required" },
   );
 
@@ -58,8 +58,8 @@ export async function PATCH(
   if (parsed.data.category !== undefined) {
     patch.category = parsed.data.category;
   }
-  if (parsed.data.room_type !== undefined) {
-    patch.room_type = parsed.data.room_type;
+  if (parsed.data.space_type !== undefined) {
+    patch.space_type = parsed.data.space_type;
   }
 
   const { data, error } = await supabase

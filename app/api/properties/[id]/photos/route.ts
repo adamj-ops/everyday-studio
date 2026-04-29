@@ -4,7 +4,7 @@ import { internalError } from "@/lib/api/internal-error";
 import { stripExifOverwrite } from "@/lib/photos/strip-metadata";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { RoomTypeEnum } from "@/lib/briefs/room-types";
+import { SpaceTypeEnum } from "@/lib/briefs/space-types";
 
 const PropertyIdSchema = z.string().uuid();
 
@@ -12,7 +12,7 @@ const PROPERTY_PHOTOS_BUCKET = "property-photos";
 
 const PhotoEntry = z.object({
   storage_path: z.string().min(1),
-  room_type: RoomTypeEnum,
+  space_type: SpaceTypeEnum,
   room_label: z.string().min(1).max(80),
 });
 
@@ -83,26 +83,26 @@ export async function POST(
     }
   }
 
-  // Upsert unique rooms for the (property, room_type, label) combos in the batch.
-  const uniqueRooms = new Map<string, { property_id: string; room_type: string; label: string }>();
+  // Upsert unique spaces for the (property, space_type, label) combos in the batch.
+  const uniqueSpaces = new Map<string, { property_id: string; space_type: string; label: string }>();
   for (const p of parsed.data.photos) {
-    const key = `${p.room_type}::${p.room_label}`;
-    if (!uniqueRooms.has(key)) {
-      uniqueRooms.set(key, {
+    const key = `${p.space_type}::${p.room_label}`;
+    if (!uniqueSpaces.has(key)) {
+      uniqueSpaces.set(key, {
         property_id: propertyId,
-        room_type: p.room_type,
+        space_type: p.space_type,
         label: p.room_label,
       });
     }
   }
 
-  const { error: roomsError } = await supabase
-    .from("rooms")
-    .upsert(Array.from(uniqueRooms.values()), {
-      onConflict: "property_id,room_type,label",
+  const { error: spacesError } = await supabase
+    .from("spaces")
+    .upsert(Array.from(uniqueSpaces.values()), {
+      onConflict: "property_id,space_type,label",
     });
-  if (roomsError) {
-    return internalError("photos_finalize_rooms_upsert", roomsError);
+  if (spacesError) {
+    return internalError("photos_finalize_spaces_upsert", spacesError);
   }
 
   const rows = parsed.data.photos.map((p) => ({

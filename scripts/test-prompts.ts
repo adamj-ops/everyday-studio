@@ -23,22 +23,91 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import fs from "node:fs";
 import path from "node:path";
-import { RoomBriefSchema, ProjectThemeSchema } from "../lib/briefs/schema";
+import { SpaceBriefSchema, ProjectThemeSchema } from "../lib/briefs/schema";
 import {
-  buildRenderPromptRequest,
-  buildPromptReviewRequest,
+  buildRenderPromptForSurface,
+  buildPromptReviewForSurface,
   buildRenderReviewRequest,
   type RenderPromptOutput,
   type PromptReviewOutput,
   type RenderReviewOutput,
 } from "../lib/claude/prompts";
+import type { ProjectTheme, SpaceBrief } from "../lib/briefs/schema";
+import type { RenderPromptInput } from "../lib/briefs/prompt-input";
 import {
   vincentAveKitchenBrief,
   vincentAveTheme,
   vincentAvePromptInput,
 } from "../test-fixtures/vincent-ave-kitchen";
+import {
+  vincentAveFacadeBrief,
+  vincentAveFacadeTheme,
+  vincentAveFacadePromptInput,
+} from "../test-fixtures/vincent-ave-facade";
+import {
+  lyndaleHardscapeBrief,
+  lyndaleHardscapeTheme,
+  lyndaleHardscapePromptInput,
+} from "../test-fixtures/lyndale-hardscape";
+import {
+  lyndaleLandscapeBrief,
+  lyndaleLandscapeTheme,
+  lyndaleLandscapePromptInput,
+} from "../test-fixtures/lyndale-landscape";
+import {
+  bevsTestGardenBrief,
+  bevsTestGardenTheme,
+  bevsTestGardenPromptInput,
+} from "../test-fixtures/bevs-test-garden";
 
 type ClaudeClientModule = typeof import("../lib/claude/client");
+
+interface PromptFixture {
+  key: string;
+  brief: SpaceBrief;
+  theme: ProjectTheme;
+  input: RenderPromptInput;
+  knownPromptTodo?: string;
+}
+
+const FIXTURES: Record<string, PromptFixture> = {
+  "vincent-ave-kitchen": {
+    key: "vincent-ave-kitchen",
+    brief: vincentAveKitchenBrief,
+    theme: vincentAveTheme,
+    input: vincentAvePromptInput,
+  },
+  "vincent-ave-facade": {
+    key: "vincent-ave-facade",
+    brief: vincentAveFacadeBrief,
+    theme: vincentAveFacadeTheme,
+    input: vincentAveFacadePromptInput,
+    knownPromptTodo: "TODO(adamj-ops): tune facade prompt validation after v1 surface fixtures land.",
+  },
+  "lyndale-hardscape": {
+    key: "lyndale-hardscape",
+    brief: lyndaleHardscapeBrief,
+    theme: lyndaleHardscapeTheme,
+    input: lyndaleHardscapePromptInput,
+    knownPromptTodo: "TODO(adamj-ops): tune hardscape prompt validation after v1 surface fixtures land.",
+  },
+  "lyndale-landscape": {
+    key: "lyndale-landscape",
+    brief: lyndaleLandscapeBrief,
+    theme: lyndaleLandscapeTheme,
+    input: lyndaleLandscapePromptInput,
+    knownPromptTodo: "TODO(adamj-ops): tune landscape prompt validation after v1 surface fixtures land.",
+  },
+  "bevs-test-garden": {
+    key: "bevs-test-garden",
+    brief: bevsTestGardenBrief,
+    theme: bevsTestGardenTheme,
+    input: bevsTestGardenPromptInput,
+    knownPromptTodo: "TODO(adamj-ops): tune garden prompt validation after Bev's real project data is known.",
+  },
+};
+
+let activeFixture = FIXTURES["vincent-ave-kitchen"];
 
 function loadEnvLocal() {
   const envPath = path.join(process.cwd(), ".env.local");
@@ -140,20 +209,45 @@ function buildHeuristicChecks(prompt: string): HeuristicCheck[] {
   ];
 }
 
+function buildSurfaceHeuristicChecks(prompt: string): HeuristicCheck[] {
+  return [
+    {
+      name: `Prompt is at least 1000 chars (surface v1 advisory, ${prompt.length} chars)`,
+      pass: prompt.length >= 1000,
+    },
+    {
+      name: `Prompt is under 6000 chars (advisory ceiling, ${prompt.length} chars)`,
+      pass: prompt.length < 6000,
+    },
+    {
+      name: "Prompt includes preservation language",
+      pass: /preserve|keep|do not move|exactly as/i.test(prompt),
+    },
+    {
+      name: "Prompt includes a final rendered image close line",
+      pass: /return the final rendered image only\.?\s*$/i.test(prompt.trim()),
+    },
+  ];
+}
+
 async function testPromptGeneration(): Promise<RenderPromptOutput> {
   printDivider(
-    `STAGE 1: Sonnet generates the Gemini prompt (${claude.CLAUDE_OPERATOR_MODEL}) — fixture: vincent-ave-kitchen`,
+    `STAGE 1: Sonnet generates the Gemini prompt (${claude.CLAUDE_OPERATOR_MODEL}) — fixture: ${activeFixture.key}`,
   );
 
-  const briefParsed = RoomBriefSchema.safeParse(vincentAveKitchenBrief);
-  const themeParsed = ProjectThemeSchema.safeParse(vincentAveTheme);
+  const briefParsed = SpaceBriefSchema.safeParse(activeFixture.brief);
+  const themeParsed = ProjectThemeSchema.safeParse(activeFixture.theme);
   if (!briefParsed.success || !themeParsed.success) {
     console.error("❌ Fixture failed Zod validation");
     process.exit(1);
   }
   console.log("✅ Brief and theme validate against Zod schemas\n");
 
-  const { system, user } = buildRenderPromptRequest(vincentAvePromptInput);
+  if (activeFixture.knownPromptTodo) {
+    console.log(`Known v1 surface fixture note: ${activeFixture.knownPromptTodo}\n`);
+  }
+
+  const { system, user } = buildRenderPromptForSurface(activeFixture.input);
 
   console.log("→ Calling Sonnet for render prompt generation…\n");
 
@@ -182,7 +276,10 @@ async function testPromptGeneration(): Promise<RenderPromptOutput> {
   console.log(`  ${output.notes}\n`);
 
   console.log("🔍 Heuristic quality checks:");
-  const checks = buildHeuristicChecks(output.prompt);
+  const checks =
+    activeFixture.input.surface_type === "interior_room"
+      ? buildHeuristicChecks(output.prompt)
+      : buildSurfaceHeuristicChecks(output.prompt);
   for (const c of checks) {
     console.log(`  ${c.pass ? "✅" : "❌"} ${c.name}`);
   }
@@ -190,7 +287,7 @@ async function testPromptGeneration(): Promise<RenderPromptOutput> {
   console.log(`\n  ${passCount}/${checks.length} checks passed`);
 
   fs.writeFileSync(
-    path.join(__dirname, "..", "test-fixtures", "last-prompt-output-vincent-ave-kitchen.json"),
+    path.join(__dirname, "..", "test-fixtures", `last-prompt-output-${activeFixture.key}.json`),
     JSON.stringify(output, null, 2),
   );
 
@@ -199,11 +296,11 @@ async function testPromptGeneration(): Promise<RenderPromptOutput> {
 
 async function testPromptReview(promptOutput: RenderPromptOutput): Promise<PromptReviewOutput> {
   printDivider(
-    `STAGE 2: Opus reviews Sonnet's prompt (${claude.CLAUDE_REVIEWER_MODEL}) — fixture: vincent-ave-kitchen`,
+    `STAGE 2: Opus reviews Sonnet's prompt (${claude.CLAUDE_REVIEWER_MODEL}) — fixture: ${activeFixture.key}`,
   );
 
-  const { system, user } = buildPromptReviewRequest({
-    input: vincentAvePromptInput,
+  const { system, user } = buildPromptReviewForSurface({
+    input: activeFixture.input,
     generated_prompt: promptOutput.prompt,
   });
 
@@ -251,7 +348,7 @@ async function testPromptReview(promptOutput: RenderPromptOutput): Promise<Promp
       "\n  Note: harness does NOT auto-apply revisions. Review both prompts side by side and decide.",
     );
     fs.writeFileSync(
-      path.join(__dirname, "..", "test-fixtures", "last-prompt-review-vincent-ave-kitchen.json"),
+      path.join(__dirname, "..", "test-fixtures", `last-prompt-review-${activeFixture.key}.json`),
       JSON.stringify(review, null, 2),
     );
   }
@@ -261,7 +358,7 @@ async function testPromptReview(promptOutput: RenderPromptOutput): Promise<Promp
 
 async function testRenderReview(imagePath: string) {
   printDivider(
-    `STAGE 3: Opus QA on rendered image (${claude.CLAUDE_REVIEWER_MODEL}) — fixture: vincent-ave-kitchen`,
+    `STAGE 3: Opus QA on rendered image (${claude.CLAUDE_REVIEWER_MODEL}) — fixture: ${activeFixture.key}`,
   );
 
   if (!fs.existsSync(imagePath)) {
@@ -273,7 +370,7 @@ async function testRenderReview(imagePath: string) {
   const imageBase64 = imageBuffer.toString("base64");
   const mediaType = sniffImageMediaType(imageBuffer);
 
-  const { system, user } = buildRenderReviewRequest({ input: vincentAvePromptInput });
+  const { system, user } = buildRenderReviewRequest({ input: activeFixture.input });
 
   console.log(`→ Calling Opus for render QA on ${imagePath}…\n`);
 
@@ -335,7 +432,14 @@ async function main() {
   loadEnvLocal();
   claude = await import("../lib/claude/client");
 
-  const imagePath = parseImagePathArg(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  const fixtureKey = parseFixtureArg(argv);
+  activeFixture = FIXTURES[fixtureKey];
+  if (!activeFixture) {
+    console.error(`❌ Unknown fixture "${fixtureKey}". Available: ${Object.keys(FIXTURES).join(", ")}`);
+    process.exit(1);
+  }
+  const imagePath = parseImagePathArg(argv);
 
   const promptOutput = await testPromptGeneration();
   await testPromptReview(promptOutput);
@@ -349,6 +453,20 @@ async function main() {
   }
 
   printDivider("DONE");
+}
+
+function parseFixtureArg(argv: string[]): string {
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--fixture") {
+      const next = argv[i + 1];
+      if (!next || next.startsWith("--")) {
+        console.error("❌ --fixture requires a fixture key");
+        process.exit(1);
+      }
+      return next;
+    }
+  }
+  return "vincent-ave-kitchen";
 }
 
 function parseImagePathArg(argv: string[]): string | null {

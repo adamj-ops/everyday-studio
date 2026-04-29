@@ -1,18 +1,18 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import type { RoomBriefRow, ProjectThemeRow } from "@/lib/briefs/schema";
+import type { SpaceBriefRow, ProjectThemeRow } from "@/lib/briefs/schema";
 import { budgetTierLabel, themePresetLabel } from "@/lib/briefs/themes";
-import { questionsForRoom } from "@/lib/briefs/questions";
-import { categoriesForRoom } from "@/lib/briefs/categories";
-import { roomTypeLabel } from "@/lib/briefs/room-types";
+import { questionsForSpace } from "@/lib/briefs/questions";
+import { categoriesForSpace } from "@/lib/briefs/categories";
+import { spaceTypeLabel } from "@/lib/briefs/space-types";
 
 type Props = {
-  brief: RoomBriefRow | null;
+  brief: SpaceBriefRow | null;
   projectTheme: ProjectThemeRow | null;
   roomType: string;
   roomLabel: string;
   propertyId: string;
-  roomId: string;
+  spaceId: string;
 };
 
 export function BriefSidebar({
@@ -21,7 +21,7 @@ export function BriefSidebar({
   roomType,
   roomLabel,
   propertyId,
-  roomId,
+  spaceId,
 }: Props) {
   return (
     <aside className="flex h-full flex-col gap-4 overflow-y-auto rounded-xl border border-border p-4 text-sm">
@@ -29,7 +29,7 @@ export function BriefSidebar({
         <div>
           <p className="text-xs text-muted-foreground">Brief</p>
           <h2 className="text-pretty text-sm font-medium">
-            {roomLabel} · {roomTypeLabel(roomType)}
+            {roomLabel} · {spaceTypeLabel(roomType)}
           </h2>
         </div>
         {brief ? (
@@ -84,7 +84,7 @@ export function BriefSidebar({
 
       <div className="mt-auto border-t pt-3 text-xs">
         <Link
-          href={`/properties/${propertyId}/rooms/${roomId}/brief`}
+          href={`/properties/${propertyId}/spaces/${spaceId}/brief`}
           className="text-muted-foreground underline-offset-4 hover:underline"
         >
           Edit brief →
@@ -94,8 +94,8 @@ export function BriefSidebar({
   );
 }
 
-function BriefAnswers({ brief, roomType }: { brief: RoomBriefRow; roomType: string }) {
-  const questions = questionsForRoom(roomType);
+function BriefAnswers({ brief, roomType }: { brief: SpaceBriefRow; roomType: string }) {
+  const questions = questionsForSpace(roomType);
   const lines = questions
     .map((q) => {
       const a = brief.creative_answers[q.key];
@@ -119,8 +119,8 @@ function BriefAnswers({ brief, roomType }: { brief: RoomBriefRow; roomType: stri
   );
 }
 
-function BriefCategoryCounts({ brief, roomType }: { brief: RoomBriefRow; roomType: string }) {
-  const categories = categoriesForRoom(roomType);
+function BriefCategoryCounts({ brief, roomType }: { brief: SpaceBriefRow; roomType: string }) {
+  const categories = categoriesForSpace(roomType);
   const byKey = new Map(
     brief.category_moodboards.map((cm) => [cm.category_key, cm]),
   );

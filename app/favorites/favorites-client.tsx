@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ALL_MOODBOARD_CATEGORY_KEYS, categoryLabelFromKey } from "@/lib/briefs/categories";
-import { ROOM_TYPE_OPTIONS, roomTypeLabel } from "@/lib/briefs/room-types";
+import { SPACE_TYPE_OPTIONS, spaceTypeLabel } from "@/lib/briefs/space-types";
 import type { SavedReferenceRow } from "@/lib/favorites/types";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -32,7 +32,7 @@ export function FavoritesClient() {
   const [editLabel, setEditLabel] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [editCategory, setEditCategory] = useState("");
-  const [editRoomType, setEditRoomType] = useState<string>("");
+  const [editSpaceType, setEditSpaceType] = useState<string>("");
   const [editSaving, setEditSaving] = useState(false);
   const [deleteRow, setDeleteRow] = useState<SavedReferenceRow | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
@@ -42,7 +42,7 @@ export function FavoritesClient() {
     try {
       const params = new URLSearchParams();
       if (categoryFilter !== "all") params.set("category", categoryFilter);
-      if (roomFilter !== "all") params.set("room_type", roomFilter);
+      if (roomFilter !== "all") params.set("space_type", roomFilter);
       const qs = params.toString();
       const res = await fetch(qs ? `/api/favorites?${qs}` : "/api/favorites");
       const body = (await res.json().catch(() => ({}))) as {
@@ -87,7 +87,7 @@ export function FavoritesClient() {
     setEditLabel(row.label ?? "");
     setEditNotes(row.notes ?? "");
     setEditCategory(row.category);
-    setEditRoomType(row.room_type ?? "");
+    setEditSpaceType(row.space_type ?? "");
   };
 
   const submitEdit = async () => {
@@ -101,7 +101,7 @@ export function FavoritesClient() {
           label: editLabel.trim() || null,
           notes: editNotes.trim() || null,
           category: editCategory,
-          room_type: editRoomType === "" ? null : editRoomType,
+          space_type: editSpaceType === "" ? null : editSpaceType,
         }),
       });
       const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -177,7 +177,7 @@ export function FavoritesClient() {
               aria-label="Filter by room type"
             >
               <option value="all">All</option>
-              {ROOM_TYPE_OPTIONS.map((o) => (
+              {SPACE_TYPE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
@@ -236,7 +236,7 @@ export function FavoritesClient() {
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {categoryLabelFromKey(row.category)}
-                      {row.room_type ? ` · ${roomTypeLabel(row.room_type)}` : ""}
+                      {row.space_type ? ` · ${spaceTypeLabel(row.space_type)}` : ""}
                     </p>
                   </div>
                   <div className="mt-auto flex gap-2">
@@ -309,12 +309,12 @@ export function FavoritesClient() {
               <span className="text-xs text-muted-foreground">Room type (optional)</span>
               <select
                 className={cn(selectCls, "w-full")}
-                value={editRoomType}
-                onChange={(e) => setEditRoomType(e.target.value)}
+                value={editSpaceType}
+                onChange={(e) => setEditSpaceType(e.target.value)}
                 aria-label="Room type"
               >
                 <option value="">Any room</option>
-                {ROOM_TYPE_OPTIONS.map((o) => (
+                {SPACE_TYPE_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
                   </option>

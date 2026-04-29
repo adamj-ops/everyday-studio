@@ -1,7 +1,7 @@
-import type { ProjectTheme, RoomBrief } from "../lib/briefs/schema";
+import type { ProjectTheme, SpaceBrief } from "../lib/briefs/schema";
 import type {
   PromptInputProperty,
-  PromptInputRoom,
+  PromptInputSpace,
   RenderPromptInput,
 } from "../lib/briefs/prompt-input";
 import { buildRenderPromptInput } from "../lib/briefs/prompt-input";
@@ -24,8 +24,8 @@ export const vincentAveProperty: PromptInputProperty = {
   buyer_persona: "young_family",
 };
 
-export const vincentAveRoom: PromptInputRoom = {
-  room_type: "kitchen",
+export const vincentAveSpace: PromptInputSpace = {
+  space_type: "kitchen",
   label: "Primary Kitchen",
 };
 
@@ -36,7 +36,8 @@ export const vincentAveTheme: ProjectTheme = {
   theme_custom_description: null,
 };
 
-export const vincentAveKitchenBrief: RoomBrief = {
+export const vincentAveKitchenBrief: SpaceBrief = {
+  surface_type: "interior_room",
   creative_answers: {
     vibe:
       "Warm and lived-in — a family that cooks every Sunday, layered whites with unlacquered brass that patinas over time.",
@@ -111,7 +112,7 @@ export const vincentAveKitchenBasePhotoDescription = `Dated 1990s kitchen, 12x14
 export const vincentAvePromptInput: RenderPromptInput = buildRenderPromptInput({
   property: vincentAveProperty,
   project_theme: vincentAveTheme,
-  room: vincentAveRoom,
+  space: vincentAveSpace,
   brief: vincentAveKitchenBrief,
   base_photo_description: vincentAveKitchenBasePhotoDescription,
 });

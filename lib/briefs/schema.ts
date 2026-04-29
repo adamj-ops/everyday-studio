@@ -24,6 +24,15 @@ export const ThemePresetEnum = z.enum([
 ]);
 export type ThemePreset = z.infer<typeof ThemePresetEnum>;
 
+export const SurfaceTypeEnum = z.enum([
+  "interior_room",
+  "facade",
+  "hardscape",
+  "landscape",
+  "garden",
+]);
+export type SurfaceType = z.infer<typeof SurfaceTypeEnum>;
+
 export const ProjectThemeSchema = z
   .object({
     budget_tier: BudgetTierEnum,
@@ -60,12 +69,13 @@ export const CategoryMoodboardSchema = z.object({
 });
 export type CategoryMoodboard = z.infer<typeof CategoryMoodboardSchema>;
 
-export const RoomBriefSchema = z.object({
+export const SpaceBriefSchema = z.object({
+  surface_type: SurfaceTypeEnum.default("interior_room"),
   creative_answers: z.record(z.string(), z.string()).default({}),
   non_negotiables: z.string().max(4000).nullable().default(null),
   category_moodboards: z.array(CategoryMoodboardSchema).default([]),
 });
-export type RoomBrief = z.infer<typeof RoomBriefSchema>;
+export type SpaceBrief = z.infer<typeof SpaceBriefSchema>;
 
 /**
  * Row shapes as persisted in Supabase. Kept separate from the application
@@ -79,9 +89,9 @@ export interface ProjectThemeRow extends ProjectTheme {
   updated_at: string;
 }
 
-export interface RoomBriefRow extends RoomBrief {
+export interface SpaceBriefRow extends SpaceBrief {
   id: string;
-  room_id: string;
+  space_id: string;
   version: number;
   created_at: string;
   updated_at: string;

@@ -11,26 +11,26 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import type { RoomBriefRow } from "@/lib/briefs/schema";
+import type { SpaceBriefRow } from "@/lib/briefs/schema";
 
 export function BriefHistoryDialog({
-  roomId,
+  spaceId,
   onRestore,
 }: {
-  roomId: string;
-  onRestore: (brief: RoomBriefRow) => void;
+  spaceId: string;
+  onRestore: (brief: SpaceBriefRow) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [versions, setVersions] = useState<RoomBriefRow[] | null>(null);
+  const [versions, setVersions] = useState<SpaceBriefRow[] | null>(null);
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/rooms/${roomId}/brief/history`)
+    fetch(`/api/spaces/${spaceId}/brief/history`)
       .then((res) => (res.ok ? res.json() : Promise.reject(res)))
-      .then((body: { versions: RoomBriefRow[] }) => {
+      .then((body: { versions: SpaceBriefRow[] }) => {
         if (!cancelled) setVersions(body.versions);
       })
       .catch(() => {
@@ -42,7 +42,7 @@ export function BriefHistoryDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, roomId]);
+  }, [open, spaceId]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

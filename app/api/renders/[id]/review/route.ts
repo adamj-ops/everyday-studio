@@ -30,7 +30,7 @@ export async function POST(
 
   const { data: render, error: renderErr } = await supabase
     .from("renders")
-    .select("id, room_id, storage_path, status")
+    .select("id, space_id, storage_path, status")
     .eq("id", renderId)
     .maybeSingle();
   if (renderErr) {
@@ -47,14 +47,14 @@ export async function POST(
   // that produced the render — review is a re-evaluation against current intent).
   const loaded = await loadPromptInput({
     supabase,
-    roomId: render.room_id,
+    spaceId: render.space_id,
     basePhotoDescription: "Re-review of an existing render against the current brief.",
   });
   if (!loaded.ok) {
-    if (loaded.error === "no_brief_for_room") {
-      return NextResponse.json({ error: "no_brief_for_room" }, { status: 400 });
+    if (loaded.error === "no_brief_for_space") {
+      return NextResponse.json({ error: "no_brief_for_space" }, { status: 400 });
     }
-    if (loaded.error === "room_not_found" || loaded.error === "property_not_found") {
+    if (loaded.error === "space_not_found" || loaded.error === "property_not_found") {
       return NextResponse.json({ error: loaded.error }, { status: 404 });
     }
     return internalError("review_load_prompt_input", new Error(loaded.error));

@@ -1,8 +1,8 @@
-import { questionsForRoom } from "./questions";
-import { categoriesForRoom } from "./categories";
-import type { RoomBrief, ProjectTheme } from "./schema";
+import { questionsForSpace } from "./questions";
+import { categoriesForSpace } from "./categories";
+import type { ProjectTheme, SpaceBrief, SurfaceType } from "./schema";
 import { budgetTierLabel, themePresetLabel } from "./themes";
-import { roomTypeLabel } from "./room-types";
+import { spaceTypeLabel } from "./space-types";
 
 export interface PromptInputProperty {
   address: string;
@@ -11,8 +11,8 @@ export interface PromptInputProperty {
   buyer_persona: string | null;
 }
 
-export interface PromptInputRoom {
-  room_type: string;
+export interface PromptInputSpace {
+  space_type: string;
   label: string;
 }
 
@@ -36,10 +36,11 @@ export interface PromptInputCategorySummary {
  * `reference_images`.
  */
 export interface RenderPromptInput {
+  surface_type: SurfaceType;
   property: PromptInputProperty;
   project_theme: ProjectTheme | null;
-  room: PromptInputRoom;
-  room_brief: {
+  space: PromptInputSpace;
+  space_brief: {
     creative_answers: Record<string, string>;
     non_negotiables: string | null;
     category_moodboards: PromptInputCategorySummary[];
@@ -56,11 +57,11 @@ export interface RenderPromptInput {
 export function buildRenderPromptInput(args: {
   property: PromptInputProperty;
   project_theme: ProjectTheme | null;
-  room: PromptInputRoom;
-  brief: RoomBrief;
+  space: PromptInputSpace;
+  brief: SpaceBrief;
   base_photo_description: string;
 }): RenderPromptInput {
-  const { brief, room } = args;
+  const { brief, space } = args;
 
   const categorySummaries: PromptInputCategorySummary[] = brief.category_moodboards.map((cm) => ({
     category_key: cm.category_key,
@@ -78,10 +79,11 @@ export function buildRenderPromptInput(args: {
   );
 
   return {
+    surface_type: brief.surface_type,
     property: args.property,
     project_theme: args.project_theme,
-    room,
-    room_brief: {
+    space,
+    space_brief: {
       creative_answers: brief.creative_answers,
       non_negotiables: brief.non_negotiables,
       category_moodboards: categorySummaries,
@@ -92,11 +94,11 @@ export function buildRenderPromptInput(args: {
 }
 
 /**
- * Flatten a `RoomBrief.category_moodboards` into ordered storage paths so
+ * Flatten a `SpaceBrief.category_moodboards` into ordered storage paths so
  * the route that downloads bytes can keep the same order as
  * `input.reference_images`.
  */
-export function flattenMoodboardPaths(brief: RoomBrief): string[] {
+export function flattenMoodboardPaths(brief: SpaceBrief): string[] {
   return brief.category_moodboards.flatMap((cm) => cm.image_storage_paths);
 }
 
@@ -133,15 +135,24 @@ export function summarizeBriefForPrompt(input: RenderPromptInput): string {
     parts.push("Project theme: not set — derive budget and aesthetic from the brief");
   }
 
-  parts.push(`Room: ${roomTypeLabel(input.room.room_type)} — "${input.room.label}"`);
+  parts.push(`Surface type: ${input.surface_type.replace(/_/g, " ")}`);
+  parts.push(`Space: ${spaceTypeLabel(input.space.space_type)} — "${input.space.label}"`);
 
-  const questions = questionsForRoom(input.room.room_type);
+  const questions = questionsForSpace(input.space.space_type);
   const answered: string[] = [];
   for (const q of questions) {
-    const raw = input.room_brief.creative_answers[q.key];
+    const raw = input.space_brief.creative_answers[q.key];
     if (typeof raw === "string" && raw.trim().length > 0) {
       answered.push(`  Q: ${q.prompt}\n  A: ${raw.trim()}`);
     }
+  }
+  const surfaceDirection = input.space_brief.creative_answers.creative_direction;
+  if (
+    input.surface_type !== "interior_room" &&
+    typeof surfaceDirection === "string" &&
+    surfaceDirection.trim().length > 0
+  ) {
+    answered.unshift(`  Q: Creative direction for this surface\n  A: ${surfaceDirection.trim()}`);
   }
   if (answered.length > 0) {
     parts.push("Creative direction:");
@@ -150,14 +161,14 @@ export function summarizeBriefForPrompt(input: RenderPromptInput): string {
     parts.push("Creative direction: (designer left blank — lean on moodboards and theme)");
   }
 
-  if (input.room_brief.non_negotiables && input.room_brief.non_negotiables.trim()) {
-    parts.push(`Non-negotiables (HARD CONSTRAINTS): ${input.room_brief.non_negotiables.trim()}`);
+  if (input.space_brief.non_negotiables && input.space_brief.non_negotiables.trim()) {
+    parts.push(`Non-negotiables (HARD CONSTRAINTS): ${input.space_brief.non_negotiables.trim()}`);
   }
 
-  const categories = categoriesForRoom(input.room.room_type);
+  const categories = categoriesForSpace(input.space.space_type);
   const moodboardLines: string[] = [];
   for (const cat of categories) {
-    const summary = input.room_brief.category_moodboards.find(
+    const summary = input.space_brief.category_moodboards.find(
       (cm) => cm.category_key === cat.key,
     );
     const count = summary?.image_count ?? 0;
@@ -169,6 +180,16 @@ export function summarizeBriefForPrompt(input: RenderPromptInput): string {
   if (moodboardLines.length > 0) {
     parts.push("Moodboard (inspiration images will be attached as references):");
     parts.push(moodboardLines.join("\n"));
+  } else if (input.space_brief.category_moodboards.length > 0) {
+    parts.push("Moodboard (inspiration images will be attached as references):");
+    parts.push(
+      input.space_brief.category_moodboards
+        .map((cm) => {
+          const notes = cm.notes?.trim() ? ` — notes: ${cm.notes.trim()}` : "";
+          return `  - ${cm.category_label}: ${cm.image_count} image${cm.image_count === 1 ? "" : "s"}${notes}`;
+        })
+        .join("\n"),
+    );
   } else {
     parts.push("Moodboard: (empty)");
   }

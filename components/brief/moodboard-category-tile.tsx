@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { FavoritesPicker } from "@/components/favorites/picker";
-import { RoomTypeEnum } from "@/lib/briefs/room-types";
+import { SpaceTypeEnum } from "@/lib/briefs/space-types";
 import type { Category } from "@/lib/briefs/categories";
 
 const MAX_IMAGES = 10;
@@ -35,7 +35,7 @@ export interface MoodboardTileState {
 
 export function MoodboardCategoryTile({
   category,
-  roomId,
+  spaceId,
   roomType,
   state,
   onChange,
@@ -43,7 +43,7 @@ export function MoodboardCategoryTile({
   onFavoritePathSaved,
 }: {
   category: Category;
-  roomId: string;
+  spaceId: string;
   roomType: string;
   state: MoodboardTileState;
   onChange: (next: MoodboardTileState) => void;
@@ -60,7 +60,7 @@ export function MoodboardCategoryTile({
   const [saveNotes, setSaveNotes] = useState("");
   const [saveSubmitting, setSaveSubmitting] = useState(false);
 
-  const roomTypeParsed = RoomTypeEnum.safeParse(roomType);
+  const roomTypeParsed = SpaceTypeEnum.safeParse(roomType);
 
   const count = state.image_storage_paths.length;
   const atCap = count >= MAX_IMAGES;
@@ -71,7 +71,7 @@ export function MoodboardCategoryTile({
       return;
     }
 
-    const signRes = await fetch(`/api/rooms/${roomId}/moodboard/upload-sign`, {
+    const signRes = await fetch(`/api/spaces/${spaceId}/moodboard/upload-sign`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -106,7 +106,7 @@ export function MoodboardCategoryTile({
 
     let displayUrl: string | null = null;
     try {
-      const signViewRes = await fetch(`/api/rooms/${roomId}/moodboard/sign-view`, {
+      const signViewRes = await fetch(`/api/spaces/${spaceId}/moodboard/sign-view`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ paths: [storage_path] }),
@@ -189,7 +189,7 @@ export function MoodboardCategoryTile({
         body: JSON.stringify({
           storage_path: savePath,
           category: category.key,
-          room_type: roomTypeParsed.success ? roomTypeParsed.data : null,
+          space_type: roomTypeParsed.success ? roomTypeParsed.data : null,
           label: saveLabel.trim() || null,
           notes: saveNotes.trim() || null,
           original_filename: names[savePath] ?? null,
@@ -230,7 +230,7 @@ export function MoodboardCategoryTile({
     }
     let displayUrl: string | null = null;
     try {
-      const signViewRes = await fetch(`/api/rooms/${roomId}/moodboard/sign-view`, {
+      const signViewRes = await fetch(`/api/spaces/${spaceId}/moodboard/sign-view`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ paths: [storagePath] }),

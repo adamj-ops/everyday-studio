@@ -29,7 +29,7 @@ export async function GET(
   const { data: render, error } = await supabase
     .from("renders")
     .select(
-      "id, room_id, base_photo_id, room_spec_id, parent_render_id, status, storage_path, prompt_text, opus_verdict, opus_critiques_json, error_message, cost_estimate_cents, created_at",
+      "id, space_id, base_photo_id, room_spec_id, parent_render_id, status, storage_path, prompt_text, opus_verdict, opus_critiques_json, error_message, cost_estimate_cents, created_at",
     )
     .eq("id", id)
     .maybeSingle();
@@ -43,7 +43,7 @@ export async function GET(
   const { count: ordinal } = await supabase
     .from("renders")
     .select("*", { count: "exact", head: true })
-    .eq("room_id", render.room_id)
+    .eq("space_id", render.space_id)
     .lte("created_at", render.created_at);
 
   let signedUrl: string | null = null;
@@ -97,7 +97,7 @@ export async function GET(
 
   return NextResponse.json({
     id: render.id,
-    room_id: render.room_id,
+    space_id: render.space_id,
     base_photo_id: render.base_photo_id,
     room_spec_id: render.room_spec_id,
     parent_render_id: render.parent_render_id,

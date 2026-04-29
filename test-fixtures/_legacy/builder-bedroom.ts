@@ -24,7 +24,7 @@ export const builderBedroomContext: PropertyContext = {
 };
 
 export const builderBedroomSpec: RoomSpec = {
-  room_type: "secondary_bedroom",
+  space_type: "secondary_bedroom",
   room_name: "Secondary Bedroom (NW)",
   dimensions: "10x11",
   ceiling_height: "8 ft",

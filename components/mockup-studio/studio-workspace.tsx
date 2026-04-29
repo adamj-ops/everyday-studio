@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { RoomBriefRow, ProjectThemeRow } from "@/lib/briefs/schema";
+import type { SpaceBriefRow, ProjectThemeRow } from "@/lib/briefs/schema";
 import type { RenderReviewOutput, PromptReviewOutput } from "@/lib/claude/prompts";
 import { BriefSidebar } from "./brief-sidebar";
 import { RenderCanvas } from "./render-canvas";
@@ -21,12 +21,12 @@ type InitialRender = {
 } | null;
 
 export type StudioWorkspaceProps = {
-  brief: RoomBriefRow | null;
+  brief: SpaceBriefRow | null;
   projectTheme: ProjectThemeRow | null;
   roomType: string;
   roomLabel: string;
   propertyId: string;
-  roomId: string;
+  spaceId: string;
   basePhotoId: string | null;
   moodboardImages: MoodboardImageItem[];
   initialRender: InitialRender;
@@ -59,7 +59,7 @@ export function StudioWorkspace({
   roomType,
   roomLabel,
   propertyId,
-  roomId,
+  spaceId,
   basePhotoId,
   moodboardImages,
   initialRender,
@@ -210,7 +210,7 @@ export function StudioWorkspace({
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          room_id: roomId,
+          space_id: spaceId,
           base_photo_id: basePhotoId,
           idempotency_key: idempotencyKey,
         }),
@@ -242,7 +242,7 @@ export function StudioWorkspace({
     } finally {
       setSubmitting(false);
     }
-  }, [hasBrief, basePhotoId, roomId, startPolling]);
+  }, [hasBrief, basePhotoId, spaceId, startPolling]);
 
   const onRefresh = useCallback(async () => {
     if (!render) return;
@@ -346,13 +346,13 @@ export function StudioWorkspace({
           roomType={roomType}
           roomLabel={roomLabel}
           propertyId={propertyId}
-          roomId={roomId}
+          spaceId={spaceId}
         />
       </div>
       <div className="col-span-6 flex min-h-0 flex-col gap-4">
         <MoodboardPanel
           images={moodboardImages}
-          briefHref={`/properties/${propertyId}/rooms/${roomId}/brief`}
+          briefHref={`/properties/${propertyId}/spaces/${spaceId}/brief`}
         />
         <div className="min-h-0 flex-1">
           {!hasBrief ? (
@@ -365,7 +365,7 @@ export function StudioWorkspace({
                 non-negotiables the renderer synthesizes into a Gemini prompt.
               </p>
               <Link
-                href={`/properties/${propertyId}/rooms/${roomId}/brief`}
+                href={`/properties/${propertyId}/spaces/${spaceId}/brief`}
                 className="text-sm underline-offset-4 hover:underline"
               >
                 Open brief →
@@ -373,7 +373,7 @@ export function StudioWorkspace({
             </div>
           ) : (
             <RenderCanvas
-              roomId={roomId}
+              spaceId={spaceId}
               initialRender={canvasInitial}
               downloadFileParts={downloadFileParts}
               hasBasePhoto={Boolean(basePhotoId)}

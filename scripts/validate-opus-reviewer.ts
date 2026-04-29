@@ -25,8 +25,8 @@ import type Anthropic from "@anthropic-ai/sdk";
 import fs from "node:fs";
 import path from "node:path";
 import {
-  buildRenderPromptRequest,
-  buildPromptReviewRequest,
+  buildRenderPromptForSurface,
+  buildPromptReviewForSurface,
   type RenderPromptOutput,
   type PromptReviewOutput,
   type PromptReviewIssue,
@@ -101,7 +101,7 @@ interface Run {
 async function runOnce(index: number): Promise<Run> {
   const start = Date.now();
 
-  const gen = buildRenderPromptRequest(vincentAvePromptInput);
+  const gen = buildRenderPromptForSurface(vincentAvePromptInput);
 
   const sonnetResp = await claude.anthropicClient.messages.create({
     model: claude.CLAUDE_OPERATOR_MODEL,
@@ -111,7 +111,7 @@ async function runOnce(index: number): Promise<Run> {
   });
   const promptOutput = parseJsonFromClaude<RenderPromptOutput>(extractText(sonnetResp));
 
-  const rev = buildPromptReviewRequest({
+  const rev = buildPromptReviewForSurface({
     input: vincentAvePromptInput,
     generated_prompt: promptOutput.prompt,
   });

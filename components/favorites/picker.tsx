@@ -39,7 +39,7 @@ export function FavoritesPicker({
     setLoading(true);
     setLoadError(null);
     try {
-      const qs = new URLSearchParams({ category: categoryKey, room_type: roomType });
+      const qs = new URLSearchParams({ category: categoryKey, space_type: roomType });
       const res = await fetch(`/api/favorites?${qs.toString()}`);
       const body = (await res.json().catch(() => ({}))) as {
         favorites?: SavedReferenceRow[];

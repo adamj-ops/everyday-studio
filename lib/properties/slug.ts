@@ -10,7 +10,7 @@ export function slugifyAddress(address: string): string {
 }
 
 /** Snake-ish room type for filenames. */
-export function slugifyRoomType(roomType: string): string {
+export function slugifySpaceType(roomType: string): string {
   const s = roomType
     .toLowerCase()
     .trim()

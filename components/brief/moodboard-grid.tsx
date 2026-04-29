@@ -5,7 +5,7 @@ import { MoodboardCategoryTile, type MoodboardTileState } from "./moodboard-cate
 
 export function MoodboardGrid({
   categories,
-  roomId,
+  spaceId,
   roomType,
   state,
   onChangeCategory,
@@ -13,7 +13,7 @@ export function MoodboardGrid({
   onFavoritePathSaved,
 }: {
   categories: Category[];
-  roomId: string;
+  spaceId: string;
   roomType: string;
   state: Record<string, MoodboardTileState>;
   onChangeCategory: (categoryKey: string, next: MoodboardTileState) => void;
@@ -33,7 +33,7 @@ export function MoodboardGrid({
           <MoodboardCategoryTile
             key={cat.key}
             category={cat}
-            roomId={roomId}
+            spaceId={spaceId}
             roomType={roomType}
             state={tileState}
             onChange={(next) => onChangeCategory(cat.key, next)}
