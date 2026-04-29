@@ -13,6 +13,7 @@ import { NonNegotiables } from "./non-negotiables";
 import { BriefHistoryDialog } from "./brief-history-dialog";
 import { categoriesForSpace } from "@/lib/briefs/categories";
 import { questionsForSpace } from "@/lib/briefs/questions";
+import { buildSpaceBriefSavePayload } from "@/lib/briefs/save-payload";
 import { spaceTypeLabel } from "@/lib/briefs/space-types";
 import type { SpaceBriefRow } from "@/lib/briefs/schema";
 import type { MoodboardTileState } from "./moodboard-category-tile";
@@ -140,32 +141,14 @@ export function BriefForm({
   const hasSaved = state.lastSavedVersion !== null && !state.dirty;
 
   const persist = async (): Promise<number | null> => {
-    const categoryMoodboards = categories
-      .map((cat) => {
-        const tile = state.tiles[cat.key];
-        if (!tile || (tile.image_storage_paths.length === 0 && !tile.notes.trim())) {
-          return null;
-        }
-        return {
-          category_key: cat.key,
-          category_label: cat.label,
-          image_storage_paths: tile.image_storage_paths,
-          notes: tile.notes.trim() === "" ? null : tile.notes.trim(),
-        };
-      })
-      .filter(Boolean);
-
-    // Strip empty answers server-side too — no need to persist untouched keys.
-    const trimmedAnswers: Record<string, string> = {};
-    for (const [k, v] of Object.entries(state.creative_answers)) {
-      if (typeof v === "string" && v.trim() !== "") trimmedAnswers[k] = v.trim();
-    }
-
-    const payload = {
-      creative_answers: trimmedAnswers,
-      non_negotiables: state.non_negotiables.trim() === "" ? null : state.non_negotiables.trim(),
-      category_moodboards: categoryMoodboards,
-    };
+    const payload = buildSpaceBriefSavePayload({
+      spaceType: roomType,
+      initialSurfaceType: initialBrief?.surface_type,
+      creativeAnswers: state.creative_answers,
+      nonNegotiables: state.non_negotiables,
+      categories,
+      tiles: state.tiles,
+    });
 
     const res = await fetch(`/api/spaces/${spaceId}/brief`, {
       method: "PUT",

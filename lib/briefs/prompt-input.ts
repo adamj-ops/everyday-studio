@@ -146,14 +146,6 @@ export function summarizeBriefForPrompt(input: RenderPromptInput): string {
       answered.push(`  Q: ${q.prompt}\n  A: ${raw.trim()}`);
     }
   }
-  const surfaceDirection = input.space_brief.creative_answers.creative_direction;
-  if (
-    input.surface_type !== "interior_room" &&
-    typeof surfaceDirection === "string" &&
-    surfaceDirection.trim().length > 0
-  ) {
-    answered.unshift(`  Q: Creative direction for this surface\n  A: ${surfaceDirection.trim()}`);
-  }
   if (answered.length > 0) {
     parts.push("Creative direction:");
     parts.push(answered.join("\n"));
@@ -161,8 +153,9 @@ export function summarizeBriefForPrompt(input: RenderPromptInput): string {
     parts.push("Creative direction: (designer left blank — lean on moodboards and theme)");
   }
 
-  if (input.space_brief.non_negotiables && input.space_brief.non_negotiables.trim()) {
-    parts.push(`Non-negotiables (HARD CONSTRAINTS): ${input.space_brief.non_negotiables.trim()}`);
+  const nonNegotiables = input.space_brief.non_negotiables?.trim();
+  if (nonNegotiables) {
+    parts.push(`Non-negotiables (HARD CONSTRAINTS): ${nonNegotiables}`);
   }
 
   const categories = categoriesForSpace(input.space.space_type);

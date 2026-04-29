@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test:prompts": "tsx scripts/test-prompts.ts",
     "test:agent-intents": "tsx scripts/test-agent-intents.ts",
+    "test:brief-regressions": "tsx scripts/test-brief-regressions.ts",
     "test:nano": "tsx scripts/test-nano-banana.ts",
     "edit:nano": "tsx scripts/edit-nano-banana.ts",
     "validate:opus": "tsx scripts/validate-opus-reviewer.ts",

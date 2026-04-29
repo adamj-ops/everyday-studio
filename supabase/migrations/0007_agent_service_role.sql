@@ -56,6 +56,7 @@ grant insert, update on
   properties,
   spaces,
   space_briefs,
+  project_themes,
   renders,
   brief_references,
   saved_references
@@ -101,9 +102,10 @@ create policy "brief_references_agent_rw" on brief_references
   using (true)
   with check (true);
 
-create policy "project_themes_agent_select" on project_themes
-  for select to agent_service
-  using (true);
+create policy "project_themes_agent_rw" on project_themes
+  for all to agent_service
+  using (true)
+  with check (true);
 
 create policy "property_photos_agent_select" on property_photos
   for select to agent_service
