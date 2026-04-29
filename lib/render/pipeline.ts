@@ -5,8 +5,8 @@ import {
   CLAUDE_REVIEWER_MODEL,
 } from "@/lib/claude/client";
 import {
-  buildRenderPromptRequest,
-  buildPromptReviewRequest,
+  buildRenderPromptForSurface,
+  buildPromptReviewForSurface,
   buildRenderReviewRequest,
   RenderPromptOutputSchema,
   PromptReviewOutputSchema,
@@ -171,7 +171,7 @@ async function callSonnetPrompt(args: {
   previousIssues: PromptReviewOutput["issues"] | null;
   tokens: PipelineTokenUsage;
 }): Promise<RenderPromptOutput> {
-  const { system, user } = buildRenderPromptRequest(args.input);
+  const { system, user } = buildRenderPromptForSurface(args.input);
 
   const userMsg = args.previousIssues
     ? `${user}\n\nPREVIOUS ATTEMPT REVIEW (regenerate):\nOpus flagged the previous prompt as regenerate for the following reasons. Address each before producing the new prompt:\n${args.previousIssues
@@ -196,7 +196,7 @@ async function callOpusPromptReview(args: {
   generatedPrompt: string;
   tokens: PipelineTokenUsage;
 }): Promise<PromptReviewOutput> {
-  const { system, user } = buildPromptReviewRequest({
+  const { system, user } = buildPromptReviewForSurface({
     input: args.input,
     generated_prompt: args.generatedPrompt,
   });

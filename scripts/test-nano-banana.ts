@@ -254,7 +254,7 @@ async function main() {
   - Preserved: window, doorway locations, ceiling geometry?
 
   For full-pipeline testing (Sonnet -> Opus -> Gemini -> Opus):
-    npx tsx scripts/run-render-e2e.ts <room_id> <base_photo_id>
+    npx tsx scripts/run-render-e2e.ts <space_id> <base_photo_id>
 `);
 }
 

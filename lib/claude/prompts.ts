@@ -11,7 +11,7 @@ import { summarizeBriefForPrompt } from "@/lib/briefs/prompt-input";
  *   3. buildRenderReviewRequest — Opus QA for the rendered image
  *
  * Input shape is `RenderPromptInput` from `lib/briefs/prompt-input.ts`:
- * property + project theme + room + creative answers + non-negotiables +
+ * property + project theme + space + creative answers + non-negotiables +
  * moodboard category metadata. Reference image bytes flow separately
  * through `buildContentsArray` in `lib/gemini/prompts.ts` — Sonnet sees
  * only metadata (category label, image count).
@@ -64,7 +64,7 @@ Gemini accepts conversational, thorough prose. There is NO separate negative pro
 PROMPT STRUCTURE (required sections, in this order):
 
 1. OPENING GEOMETRY LOCK — one paragraph. Something like:
-   "Render this {room_type} as a finished, photorealistic renovation. Keep the existing room dimensions, ceiling height, window placements, and doorway locations exactly as they are in the source photo — do not change the architecture."
+   "Render this {space_type} as a finished, photorealistic renovation. Keep the existing room dimensions, ceiling height, window placements, and doorway locations exactly as they are in the source photo — do not change the architecture."
    Then add property + buyer + theme context in one or two sentences.
 
 2. DESIGN DIRECTION — the heart of the prompt. Prose, not bullets. Synthesize the creative answers: what the room feels like, the hero moment, how people use it. Name materials the designer is excited about. Weave in the theme (e.g. "in a Japandi register" or "with the restraint of Plain English kitchens").
@@ -127,6 +127,80 @@ ${buildReferenceList(input)}
 Return the JSON now.`;
 
   return { system, user };
+}
+
+export function buildFacadeRenderPromptRequest(
+  input: RenderPromptInput & { surface_type: "facade" },
+): { system: string; user: string } {
+  return buildExteriorRenderPromptRequest(input, {
+    label: "facade",
+    focus:
+      "Respect the existing architecture first: roofline, window rhythm, door placement, porch massing, foundation, and neighborhood context should remain believable. The prompt should specify siding, masonry, trim, entry, lighting, house numbers, railings, and paint/finish changes without inventing structural additions unless the brief explicitly asks for them.",
+    preserve:
+      "Preserve roof geometry, window and door openings, structural massing, grade, and any historically meaningful architectural details from the source photo.",
+    validation:
+      "Facade prompts fail when they erase architectural character, move windows, over-modernize a traditional shell, or add expensive structural moves not in the brief.",
+  });
+}
+
+export function buildHardscapeRenderPromptRequest(
+  input: RenderPromptInput & { surface_type: "hardscape" },
+): { system: string; user: string } {
+  return buildExteriorRenderPromptRequest(input, {
+    label: "hardscape",
+    focus:
+      "Treat driveways, walks, patios, pool decks, steps, retaining edges, drainage, and transitions as the design subject. The prompt should specify paver scale, jointing, grade changes, edging, railings, lighting, safety, and how hardscape meets planting beds and the house.",
+    preserve:
+      "Preserve building placement, curb/drive approach, major grade relationships, existing doors, and any visible drainage or access constraints from the source photo.",
+    validation:
+      "Hardscape prompts fail when paving is physically impossible, ignores slopes/drainage, blocks access, or chooses materials that fight the budget and existing exterior.",
+  });
+}
+
+export function buildLandscapeRenderPromptRequest(
+  input: RenderPromptInput & { surface_type: "landscape" },
+): { system: string; user: string } {
+  return buildExteriorRenderPromptRequest(input, {
+    label: "landscape",
+    focus:
+      "Design the broader planting and yard composition. The prompt should specify plant masses, height layers, season, maturity, regional hardiness, lawn or groundcover strategy, tree/shrub placement, mulch or gravel, and how the landscape frames the home.",
+    preserve:
+      "Preserve the house, hardscape anchors, property access, large existing trees unless called out, grade, and sightlines to entries and windows.",
+    validation:
+      "Landscape prompts fail when plantings ignore regional hardiness, appear instantly overgrown without maturity notes, hide the house, or create maintenance levels inconsistent with the brief.",
+  });
+}
+
+export function buildGardenRenderPromptRequest(
+  input: RenderPromptInput & { surface_type: "garden" },
+): { system: string; user: string } {
+  return buildExteriorRenderPromptRequest(input, {
+    label: "garden",
+    focus:
+      "Treat the garden as a closer, more intentional planted room. The prompt should specify season, plant maturity, bed geometry, containers or raised beds, trellises, edible or pollinator intent, paths, irrigation hints, and how people move through or harvest from it.",
+    preserve:
+      "Preserve surrounding architecture, existing paths or gates, sun/shade clues, grade, and any constraints implied by fences, patios, or neighboring structures.",
+    validation:
+      "Garden prompts fail when they ignore season and maturity, use plants unsuited to the light or region, overfill paths, or miss the functional purpose of the garden.",
+  });
+}
+
+export function buildRenderPromptForSurface(input: RenderPromptInput): {
+  system: string;
+  user: string;
+} {
+  switch (input.surface_type) {
+    case "interior_room":
+      return buildRenderPromptRequest(input);
+    case "facade":
+      return buildFacadeRenderPromptRequest(input as RenderPromptInput & { surface_type: "facade" });
+    case "hardscape":
+      return buildHardscapeRenderPromptRequest(input as RenderPromptInput & { surface_type: "hardscape" });
+    case "landscape":
+      return buildLandscapeRenderPromptRequest(input as RenderPromptInput & { surface_type: "landscape" });
+    case "garden":
+      return buildGardenRenderPromptRequest(input as RenderPromptInput & { surface_type: "garden" });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -217,6 +291,77 @@ Review and return the JSON now.`;
   return { system, user };
 }
 
+export function buildPromptReviewForSurface(args: {
+  input: RenderPromptInput;
+  generated_prompt: string;
+}): { system: string; user: string } {
+  if (args.input.surface_type === "interior_room") {
+    return buildPromptReviewRequest(args);
+  }
+
+  const criteria: Record<Exclude<RenderPromptInput["surface_type"], "interior_room">, string> = {
+    facade:
+      "Verify architectural preservation, exterior material credibility, entry/trim/window coherence, neighborhood plausibility, and whether the prompt avoids unsupported structural changes.",
+    hardscape:
+      "Verify paving geometry, access, grade/drainage plausibility, edge conditions, safety, material scale, and whether the hardscape connects cleanly to the house and planting beds.",
+    landscape:
+      "Verify regional hardiness, season and maturity notes, layered planting structure, sightlines, maintenance level, and whether the prompt frames rather than hides the property.",
+    garden:
+      "Verify season, plant maturity, light/shade fit, bed/path function, edible or pollinator intent where relevant, and whether the garden remains usable rather than overfilled.",
+  };
+
+  const brief = summarizeBriefForPrompt(args.input);
+  const system = `You are the prompt QA reviewer for Everyday Studio's ${args.input.surface_type.replace(/_/g, " ")} workflow. You are Claude Opus — the verifier tier in a two-tier Claude architecture. Claude Sonnet just wrote a natural-language render prompt intended for Google Gemini 2.5 Pro Image (gemini-3-pro-image-preview) based on a designer's creative brief.
+
+You are not rewriting for prose style. Verify whether THIS prompt will produce an on-brief ${args.input.surface_type.replace(/_/g, " ")} render. ${criteria[args.input.surface_type]}
+
+OUTPUT CONTRACT (strict):
+Respond with ONLY a valid JSON object, no preamble, no markdown fences:
+{
+  "verdict": "ship_it" | "revise" | "regenerate",
+  "issues": [
+    {
+      "severity": "high" | "medium" | "low",
+      "concern": string,
+      "suggestion": string
+    }
+  ],
+  "revised_prompt": string | null
+}
+
+VERDICT CALIBRATION:
+- ship_it: prompt is on-brief, non-negotiables are honored, preservation constraints are present. Low-severity issues only, or none. revised_prompt is null.
+- revise: specific localized fixes improve the odds of an on-brief render. Populate revised_prompt; keep Sonnet's structure.
+- regenerate: prompt is fundamentally off, ignores the non-negotiables, contradicts the surface type, or invents a different project. revised_prompt is null.
+
+WHAT TO FLAG:
+- Non-negotiables from the brief that were dropped or softened.
+- Missing preservation constraints from the source photo.
+- Surface-specific plausibility failures.
+- Moodboard references that should drive a concrete choice but are ignored.
+- Invented materials, colors, brands, plants, or structural changes that contradict the brief, theme, or budget.
+
+OUTPUT DISCIPLINE:
+Only emit an issue if you want revised_prompt to change because of it. If no changes are needed: verdict "ship_it", issues [], revised_prompt null.`;
+
+  const user = `BRIEF
+${brief}
+
+BASE PHOTO (before state)
+  ${args.input.base_photo_description}
+
+${buildReferenceList(args.input)}
+
+SONNET-GENERATED GEMINI PROMPT (under review):
+---
+${args.generated_prompt}
+---
+
+Review and return the JSON now.`;
+
+  return { system, user };
+}
+
 // ---------------------------------------------------------------------------
 // PROMPT 3: Opus — image review of the Gemini render
 // ---------------------------------------------------------------------------
@@ -260,7 +405,7 @@ export function buildRenderReviewRequest(args: { input: RenderPromptInput }): {
   user: string;
 } {
   const brief = summarizeBriefForPrompt(args.input);
-  const nonNegotiables = args.input.room_brief.non_negotiables?.trim() ?? "";
+  const nonNegotiables = args.input.space_brief.non_negotiables?.trim() ?? "";
 
   const system = `You are the QA reviewer for Everyday Studio. You are Claude Opus — the verifier tier. You have stronger visual reasoning than Sonnet (higher input-pixel budget, better visual-acuity benchmarks), and you are expected to use it here. Look closely at materials, finishes, color families, and anything the designer flagged as a non-negotiable. Be strict, specific, fast.
 
@@ -321,6 +466,51 @@ The rendered image is attached. Review it against the brief and return the JSON.
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+function buildExteriorRenderPromptRequest(
+  input: RenderPromptInput,
+  args: {
+    label: string;
+    focus: string;
+    preserve: string;
+    validation: string;
+  },
+): { system: string; user: string } {
+  const brief = summarizeBriefForPrompt(input);
+  const system = `You are the senior prompt engineer for Everyday Studio, translating a designer's ${args.label} brief into a photorealistic prompt for Google Gemini 2.5 Pro Image (model: gemini-3-pro-image-preview). You work like a senior exterior designer briefing a contractor: honor non-negotiables as hard constraints, synthesize the brief with the references, and keep the result buildable.
+
+SURFACE-SPECIFIC DIRECTION
+${args.focus}
+
+SOURCE PHOTO PRESERVATION
+${args.preserve}
+
+REVIEWER EXPECTATIONS
+${args.validation}
+
+Write one thorough Gemini prompt in natural language. Include these sections in order: OPENING PRESERVATION LOCK, DESIGN DIRECTION, MATERIALS / PLANTING / FINISHES, NON-NEGOTIABLES when provided, PRESERVE FROM ORIGINAL, REMOVE OR REPLACE FROM ORIGINAL, REFERENCE IMAGES when present, STAGING / SEASON / LIGHT, STYLE, and the final line. Always end with exactly: "Return the final rendered image only."
+
+Gemini accepts conversational prose. There is no separate negative prompt; all constraints and "do not" clauses belong inside the prompt. Keep the result specific enough to guide the image model without inventing details that contradict the brief.
+
+OUTPUT CONTRACT (strict):
+Respond with ONLY a valid JSON object, no preamble, no markdown fences, matching:
+{
+  "prompt": string,
+  "notes": string
+}`;
+
+  const user = `BRIEF
+${brief}
+
+BASE PHOTO (before state)
+  ${input.base_photo_description}
+
+${buildReferenceList(input)}
+
+Return the JSON now.`;
+
+  return { system, user };
+}
 
 function buildReferenceList(input: RenderPromptInput): string {
   if (input.reference_images.length === 0) {
