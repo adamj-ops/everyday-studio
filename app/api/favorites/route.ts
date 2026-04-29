@@ -3,12 +3,12 @@ import { z } from "zod";
 import { internalError } from "@/lib/api/internal-error";
 import { userOwnsStoragePathPrefix } from "@/lib/favorites/validate-storage-path";
 import { createClient } from "@/lib/supabase/server";
-import { RoomTypeEnum } from "@/lib/briefs/room-types";
+import { SpaceTypeEnum } from "@/lib/briefs/space-types";
 
 const PostBodySchema = z.object({
   storage_path: z.string().min(1).max(500),
   category: z.string().min(1).max(80),
-  room_type: RoomTypeEnum.optional().nullable(),
+  space_type: SpaceTypeEnum.optional().nullable(),
   label: z.string().max(500).nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
   original_filename: z.string().max(200).nullable().optional(),
@@ -23,15 +23,15 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const category = searchParams.get("category");
-  const roomTypeRaw = searchParams.get("room_type");
+  const roomTypeRaw = searchParams.get("space_type");
 
   if (category !== null && category !== "" && (category.length < 1 || category.length > 80)) {
     return NextResponse.json({ error: "invalid_input" }, { status: 400 });
   }
 
-  let roomType: z.infer<typeof RoomTypeEnum> | undefined;
+  let roomType: z.infer<typeof SpaceTypeEnum> | undefined;
   if (roomTypeRaw !== null && roomTypeRaw !== "") {
-    const rt = RoomTypeEnum.safeParse(roomTypeRaw);
+    const rt = SpaceTypeEnum.safeParse(roomTypeRaw);
     if (!rt.success) {
       return NextResponse.json({ error: "invalid_input", details: rt.error.flatten() }, { status: 400 });
     }
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (roomType !== undefined) {
-    q = q.or(`room_type.is.null,room_type.eq.${roomType}`);
+    q = q.or(`space_type.is.null,space_type.eq.${roomType}`);
   }
 
   const { data, error } = await q;
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     user_id: user.id,
     storage_path: parsed.data.storage_path,
     category: parsed.data.category,
-    room_type: parsed.data.room_type ?? null,
+    space_type: parsed.data.space_type ?? null,
     label: parsed.data.label?.trim() ? parsed.data.label.trim() : null,
     notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : null,
     original_filename: parsed.data.original_filename?.trim()

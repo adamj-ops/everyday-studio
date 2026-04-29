@@ -1,0 +1,54 @@
+import { type NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { createClient } from "@/lib/supabase/server";
+
+const SpaceIdSchema = z.string().uuid();
+
+const PatchSpaceSchema = z.object({
+  label: z.string().min(1).max(80).optional(),
+});
+
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+  if (!SpaceIdSchema.safeParse(id).success) {
+    return NextResponse.json({ error: "invalid_id" }, { status: 400 });
+  }
+
+  return NextResponse.json({ error: "not_implemented", session: 4 }, { status: 501 });
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+  if (!SpaceIdSchema.safeParse(id).success) {
+    return NextResponse.json({ error: "invalid_id" }, { status: 400 });
+  }
+
+  const body = await req.json().catch(() => null);
+  const parsed = PatchSpaceSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "invalid_input", details: parsed.error.flatten() },
+      { status: 400 },
+    );
+  }
+
+  return NextResponse.json({ error: "not_implemented", session: 4 }, { status: 501 });
+}

@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   // Load the parent render (RLS-scoped so cross-user access fails here).
   const { data: parent, error: parentErr } = await supabase
     .from("renders")
-    .select("id, room_id, storage_path, status")
+    .select("id, space_id, storage_path, status")
     .eq("id", parentId)
     .maybeSingle();
   if (parentErr) {
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
   // would skip.
   const loaded = await loadPromptInput({
     supabase,
-    roomId: parent.room_id,
+    spaceId: parent.space_id,
     basePhotoDescription:
       "Edit of a previously-rendered kitchen. Review the edit against the current brief.",
   });
@@ -86,12 +86,12 @@ export async function POST(req: NextRequest) {
 
   // Resolve the property_id for the new render's storage path.
   const { data: roomRow } = await supabase
-    .from("rooms")
+    .from("spaces")
     .select("property_id")
-    .eq("id", parent.room_id)
+    .eq("id", parent.space_id)
     .maybeSingle();
   if (!roomRow) {
-    return NextResponse.json({ error: "room_not_found" }, { status: 404 });
+    return NextResponse.json({ error: "space_not_found" }, { status: 404 });
   }
   const propertyId: string = roomRow.property_id;
 
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
   const { data: childRow, error: insertErr } = await supabase
     .from("renders")
     .insert({
-      room_id: parent.room_id,
+      space_id: parent.space_id,
       base_photo_id: null,
       room_spec_id: null,
       parent_render_id: parent.id,

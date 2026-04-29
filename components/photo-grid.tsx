@@ -1,4 +1,4 @@
-import { roomTypeLabel } from "@/lib/briefs/room-types";
+import { spaceTypeLabel } from "@/lib/briefs/space-types";
 
 type Photo = {
   id: string;
@@ -9,13 +9,13 @@ type Photo = {
 
 type Room = {
   id: string;
-  room_type: string;
+  space_type: string;
   label: string;
 };
 
 type Props = {
   photos: Photo[];
-  rooms: Room[];
+  spaces: Room[];
   signedUrls: Record<string, string>;
 };
 
@@ -25,14 +25,14 @@ type Group = {
   photos: Photo[];
 };
 
-function groupPhotos(photos: Photo[], rooms: Room[]): Group[] {
+function groupPhotos(photos: Photo[], spaces: Room[]): Group[] {
   // Build heading lookup by label so "Kitchen" + "Kitchen" disambiguate into
-  // the right group even if rooms share a label across types (which the
-  // unique index on rooms prevents within a property, but the type safety is
+  // the right group even if spaces share a label across types (which the
+  // unique index on spaces prevents within a property, but the type safety is
   // cheap).
   const headingByLabel = new Map<string, string>();
-  for (const r of rooms) {
-    headingByLabel.set(r.label, `${roomTypeLabel(r.room_type)} — ${r.label}`);
+  for (const r of spaces) {
+    headingByLabel.set(r.label, `${spaceTypeLabel(r.space_type)} — ${r.label}`);
   }
 
   const groups = new Map<string, Group>();
@@ -64,7 +64,7 @@ function groupPhotos(photos: Photo[], rooms: Room[]): Group[] {
   return result;
 }
 
-export function PhotoGrid({ photos, rooms, signedUrls }: Props) {
+export function PhotoGrid({ photos, spaces, signedUrls }: Props) {
   if (photos.length === 0) {
     return (
       <div className="rounded-xl border border-dashed px-6 py-12 text-center">
@@ -76,7 +76,7 @@ export function PhotoGrid({ photos, rooms, signedUrls }: Props) {
     );
   }
 
-  const groups = groupPhotos(photos, rooms);
+  const groups = groupPhotos(photos, spaces);
 
   return (
     <div className="space-y-8">

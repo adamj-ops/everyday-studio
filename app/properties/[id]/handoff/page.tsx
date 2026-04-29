@@ -5,8 +5,8 @@ import { HandoffPrintButton } from "@/components/handoff/handoff-print-button";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { questionsForRoom } from "@/lib/briefs/questions";
-import { roomTypeLabel } from "@/lib/briefs/room-types";
+import { questionsForSpace } from "@/lib/briefs/questions";
+import { spaceTypeLabel } from "@/lib/briefs/space-types";
 import { budgetTierLabel, themePresetLabel } from "@/lib/briefs/themes";
 import {
   buildDesignDirectionSummary,
@@ -55,7 +55,7 @@ export default async function HandoffPage({
   const data = await loadHandoffData(supabase, propertyId);
   if (!data) notFound();
 
-  const { property, theme, rooms } = data;
+  const { property, theme, spaces } = data;
   const summary = buildDesignDirectionSummary(data);
   const generatedLabel = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -119,7 +119,7 @@ export default async function HandoffPage({
         </dl>
       </header>
 
-      {rooms.length === 0 ? (
+      {spaces.length === 0 ? (
         <Card>
           <CardHeader>
             <CardTitle>No room briefs yet</CardTitle>
@@ -151,8 +151,8 @@ export default async function HandoffPage({
             <p className="text-pretty text-sm leading-[1.65] text-foreground">{summary}</p>
           </section>
 
-          {rooms.map((block, index) => {
-            const qs = questionsForRoom(block.room.room_type);
+          {spaces.map((block, index) => {
+            const qs = questionsForSpace(block.room.space_type);
             const answers = block.brief.creative_answers ?? {};
             const qaItems = qs
               .map((q) => {
@@ -180,7 +180,7 @@ export default async function HandoffPage({
                     {block.room.label}
                   </h2>
                   <Badge variant="secondary" className="font-normal">
-                    {roomTypeLabel(block.room.room_type)}
+                    {spaceTypeLabel(block.room.space_type)}
                   </Badge>
                   <span className="text-xs text-muted-foreground print:inline">
                     Brief v{block.briefVersion}

@@ -11,10 +11,10 @@ import { MoodboardGrid } from "./moodboard-grid";
 import { CreativeQuestions } from "./creative-questions";
 import { NonNegotiables } from "./non-negotiables";
 import { BriefHistoryDialog } from "./brief-history-dialog";
-import { categoriesForRoom } from "@/lib/briefs/categories";
-import { questionsForRoom } from "@/lib/briefs/questions";
-import { roomTypeLabel } from "@/lib/briefs/room-types";
-import type { RoomBriefRow } from "@/lib/briefs/schema";
+import { categoriesForSpace } from "@/lib/briefs/categories";
+import { questionsForSpace } from "@/lib/briefs/questions";
+import { spaceTypeLabel } from "@/lib/briefs/space-types";
+import type { SpaceBriefRow } from "@/lib/briefs/schema";
 import type { MoodboardTileState } from "./moodboard-category-tile";
 
 type TileMap = Record<string, MoodboardTileState>;
@@ -56,7 +56,7 @@ function reducer(state: State, action: Action): State {
 }
 
 function briefToState(
-  brief: RoomBriefRow | null,
+  brief: SpaceBriefRow | null,
   signedUrlsByPath: Record<string, string>,
 ): Omit<State, "dirty" | "lastSavedVersion"> {
   const tiles: TileMap = {};
@@ -83,7 +83,7 @@ function briefToState(
 }
 
 export function BriefForm({
-  roomId,
+  spaceId,
   propertyId,
   propertyAddress,
   roomType,
@@ -91,17 +91,17 @@ export function BriefForm({
   initialBrief,
   initialSignedUrls,
 }: {
-  roomId: string;
+  spaceId: string;
   propertyId: string;
   propertyAddress: string;
   roomType: string;
   roomLabel: string;
-  initialBrief: RoomBriefRow | null;
+  initialBrief: SpaceBriefRow | null;
   initialSignedUrls: Record<string, string>;
 }) {
   const router = useRouter();
-  const categories = useMemo(() => categoriesForRoom(roomType), [roomType]);
-  const questions = useMemo(() => questionsForRoom(roomType), [roomType]);
+  const categories = useMemo(() => categoriesForSpace(roomType), [roomType]);
+  const questions = useMemo(() => questionsForSpace(roomType), [roomType]);
 
   const [state, dispatch] = useReducer(
     reducer,
@@ -167,7 +167,7 @@ export function BriefForm({
       category_moodboards: categoryMoodboards,
     };
 
-    const res = await fetch(`/api/rooms/${roomId}/brief`, {
+    const res = await fetch(`/api/spaces/${spaceId}/brief`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),
@@ -200,16 +200,16 @@ export function BriefForm({
       toast.error("Save your brief before generating.");
       return;
     }
-    router.push(`/properties/${propertyId}/rooms/${roomId}/studio`);
+    router.push(`/properties/${propertyId}/spaces/${spaceId}/studio`);
   };
 
-  const onRestoreVersion = async (v: RoomBriefRow) => {
+  const onRestoreVersion = async (v: SpaceBriefRow) => {
     // Re-sign the image URLs for the restored version's paths.
     let signed: Record<string, string> = {};
     const allPaths = v.category_moodboards.flatMap((cm) => cm.image_storage_paths);
     if (allPaths.length > 0) {
       try {
-        const res = await fetch(`/api/rooms/${roomId}/moodboard/sign-view`, {
+        const res = await fetch(`/api/spaces/${spaceId}/moodboard/sign-view`, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ paths: allPaths }),
@@ -246,7 +246,7 @@ export function BriefForm({
           </li>
           <li aria-hidden="true">/</li>
           <li className="text-foreground">
-            {roomTypeLabel(roomType)} — {roomLabel}
+            {spaceTypeLabel(roomType)} — {roomLabel}
           </li>
           <li aria-hidden="true">/</li>
           <li className="text-foreground">Brief</li>
@@ -259,7 +259,7 @@ export function BriefForm({
             {roomLabel}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {roomTypeLabel(roomType)} brief
+            {spaceTypeLabel(roomType)} brief
             {state.lastSavedVersion !== null && !state.dirty && (
               <span className="ml-2 text-xs tabular-nums text-muted-foreground">
                 · saved v{state.lastSavedVersion}
@@ -273,14 +273,14 @@ export function BriefForm({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <BriefHistoryDialog roomId={roomId} onRestore={(v) => void onRestoreVersion(v)} />
+          <BriefHistoryDialog spaceId={spaceId} onRestore={(v) => void onRestoreVersion(v)} />
           <Button type="button" onClick={onSave} disabled={isSaving}>
             {isSaving ? "Saving…" : "Save brief"}
           </Button>
           <Link
             href={
               hasSaved
-                ? `/properties/${propertyId}/rooms/${roomId}/studio`
+                ? `/properties/${propertyId}/spaces/${spaceId}/studio`
                 : "#"
             }
             aria-disabled={!hasSaved || undefined}
@@ -311,7 +311,7 @@ export function BriefForm({
         </div>
         <MoodboardGrid
           categories={categories}
-          roomId={roomId}
+          spaceId={spaceId}
           roomType={roomType}
           state={state.tiles}
           onChangeCategory={(key, value) => dispatch({ type: "set_tile", key, value })}

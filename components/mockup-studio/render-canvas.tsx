@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 export interface RenderCanvasProps {
-  roomId: string;
+  spaceId: string;
   initialRender: {
     id: string;
     status: string;
@@ -46,7 +46,7 @@ function isCompleteWithoutPreview(render: NonNullable<RenderCanvasProps["initial
 }
 
 export function RenderCanvas({
-  roomId: _roomId,
+  spaceId: _spaceId,
   initialRender,
   downloadFileParts,
   hasBasePhoto,

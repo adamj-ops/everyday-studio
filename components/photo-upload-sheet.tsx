@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ROOM_TYPE_OPTIONS, type RoomType } from "@/lib/briefs/room-types";
+import { SPACE_TYPE_OPTIONS, type SpaceType } from "@/lib/briefs/space-types";
 import { createClient } from "@/lib/supabase/client";
 
 type FileStatus = "pending" | "uploading" | "done" | "failed";
@@ -24,7 +24,7 @@ type FileEntry = {
   id: string;
   file: File;
   previewUrl: string;
-  roomType: RoomType | "";
+  roomType: SpaceType | "";
   roomLabel: string;
   status: FileStatus;
   error?: string;
@@ -38,8 +38,8 @@ const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_FILES = 20;
 const MAX_BYTES = 10 * 1024 * 1024;
 
-function defaultLabelForType(roomType: RoomType): string {
-  const opt = ROOM_TYPE_OPTIONS.find((o) => o.value === roomType);
+function defaultLabelForType(roomType: SpaceType): string {
+  const opt = SPACE_TYPE_OPTIONS.find((o) => o.value === roomType);
   return opt?.label ?? roomType;
 }
 
@@ -112,7 +112,7 @@ export function PhotoUploadSheet({ propertyId }: Props) {
       updateEntry(id, { roomType: "", roomLabel: "" });
       return;
     }
-    const rt = value as RoomType;
+    const rt = value as SpaceType;
     const entry = entries.find((e) => e.id === id);
     // Seed the label with the friendly type name only if the user hasn't
     // typed their own label yet.
@@ -162,7 +162,7 @@ export function PhotoUploadSheet({ propertyId }: Props) {
       const supabase = createClient();
       const finalized: Array<{
         storage_path: string;
-        room_type: RoomType;
+        space_type: SpaceType;
         room_label: string;
       }> = [];
 
@@ -183,7 +183,7 @@ export function PhotoUploadSheet({ propertyId }: Props) {
         updateEntry(entry.id, { status: "done" });
         finalized.push({
           storage_path: upload.storage_path,
-          room_type: entry.roomType as RoomType,
+          space_type: entry.roomType as SpaceType,
           room_label: entry.roomLabel.trim(),
         });
       }
@@ -192,7 +192,7 @@ export function PhotoUploadSheet({ propertyId }: Props) {
         throw new Error("No files uploaded successfully");
       }
 
-      // Step 3: finalize — create rooms + property_photos rows.
+      // Step 3: finalize — create spaces + property_photos rows.
       const finalizeResponse = await fetch(
         `/api/properties/${propertyId}/photos`,
         {
@@ -325,7 +325,7 @@ export function PhotoUploadSheet({ propertyId }: Props) {
                           className="mt-1 flex h-8 w-full items-center rounded-md border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
                         >
                           <option value="">Select…</option>
-                          {ROOM_TYPE_OPTIONS.map((o) => (
+                          {SPACE_TYPE_OPTIONS.map((o) => (
                             <option key={o.value} value={o.value}>
                               {o.label}
                             </option>

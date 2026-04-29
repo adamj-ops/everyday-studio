@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 const BodySchema = z.object({
-  room_id: z.string().uuid(),
+  space_id: z.string().uuid(),
   base_photo_id: z.string().uuid(),
   idempotency_key: z.string().uuid().optional(),
 });
@@ -42,14 +42,14 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
-  const { room_id, base_photo_id, idempotency_key } = parsed.data;
+  const { space_id, base_photo_id, idempotency_key } = parsed.data;
 
   // Idempotency — if a prior render with the same key + room exists, return it.
   if (idempotency_key) {
     const { data: existing } = await supabase
       .from("renders")
       .select("id")
-      .eq("room_id", room_id)
+      .eq("space_id", space_id)
       .eq("idempotency_key", idempotency_key)
       .maybeSingle();
     if (existing) {
@@ -69,25 +69,25 @@ export async function POST(req: NextRequest) {
   // Load property + room + brief + theme via the shared loader (RLS-scoped).
   const loaded = await loadPromptInput({
     supabase,
-    roomId: room_id,
-    basePhotoDescription: await buildBasePhotoDescriptionFromRoom(supabase, room_id, photoRow),
+    spaceId: space_id,
+    basePhotoDescription: await buildBasePhotoDescriptionFromSpace(supabase, space_id, photoRow),
   });
 
   if (!loaded.ok) {
-    if (loaded.error === "room_not_found" || loaded.error === "property_not_found") {
+    if (loaded.error === "space_not_found" || loaded.error === "property_not_found") {
       return NextResponse.json({ error: loaded.error }, { status: 404 });
     }
-    if (loaded.error === "no_brief_for_room") {
-      return NextResponse.json({ error: "no_brief_for_room" }, { status: 400 });
+    if (loaded.error === "no_brief_for_space") {
+      return NextResponse.json({ error: "no_brief_for_space" }, { status: 400 });
     }
     return internalError("generate_load_prompt_input", new Error(loaded.error));
   }
 
   // Confirm the photo belongs to the same property as the room's brief.
   const { data: roomPropCheck } = await supabase
-    .from("rooms")
+    .from("spaces")
     .select("property_id")
-    .eq("id", room_id)
+    .eq("id", space_id)
     .maybeSingle();
   if (!roomPropCheck || roomPropCheck.property_id !== photoRow.property_id) {
     return NextResponse.json({ error: "base_photo_not_in_property" }, { status: 400 });
@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
   const { data: renderRow, error: insertErr } = await supabase
     .from("renders")
     .insert({
-      room_id,
+      space_id,
       base_photo_id,
       room_spec_id: null,
       prompt_text: "",
@@ -262,9 +262,9 @@ export async function POST(req: NextRequest) {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function buildBasePhotoDescriptionFromRoom(
+async function buildBasePhotoDescriptionFromSpace(
   _supabase: unknown,
-  _roomId: string,
+  _spaceId: string,
   photo: { storage_path: string },
 ): Promise<string> {
   // We don't have an AI-generated description of the before-photo yet; give
